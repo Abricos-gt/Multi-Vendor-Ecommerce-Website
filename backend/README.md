@@ -1,3 +1,7 @@
+Backend performance notes
+
+- Enabled Gzip via Flask-Compress. Ensure `pip install -r requirements.txt`.
+- Default Cache-Control for GET responses set to 5 minutes. Override per-route if needed.
 Backend
 =====
 
