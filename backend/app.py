@@ -141,6 +141,13 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+    # Enable gzip compression for JSON/text responses
+    try:
+        from flask_compress import Compress
+        Compress(app)
+    except Exception as _e:
+        pass
+
     CORS(
         app,
         resources={r"/*": {"origins": CORS_ORIGINS}},
@@ -184,6 +191,17 @@ def create_app():
             raise e
 
     register_routes(app)
+
+    # Add basic caching headers for GET responses without explicit headers
+    @app.after_request
+    def add_default_cache_headers(response):
+        try:
+            if request.method == 'GET' and 'Cache-Control' not in response.headers:
+                # Cache for 5 minutes by default for API GETs
+                response.headers['Cache-Control'] = 'public, max-age=300'
+        except Exception:
+            pass
+        return response
     return app
 
 

@@ -7,21 +7,24 @@
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue'
 import Navbar from './components/Navbar.vue'
 import Footer from './components/Footer.vue'
-import Home from './views/Home.vue'
-import Register from './views/Register.vue'
-import VendorDashboard from './views/VendorDashboard.vue'
-import AdminDashboard from './views/AdminDashboard.vue'
-import Products from './views/Products.vue'
-import Cart from './views/Cart.vue'
-import OrderConfirmation from './views/OrderConfirmation.vue'
-import Orders from './views/Orders.vue'
-import SignIn from './views/SignIn.vue'
-import PendingApproval from './views/PendingApproval.vue'
-import ForgotPassword from './views/ForgotPassword.vue'
-import ResetPassword from './views/ResetPassword.vue'
-import VerifyEmail from './views/VerifyEmail.vue'
+
+// Lazy-loaded route views to enable code-splitting and reduce initial bundle size
+const Home = defineAsyncComponent(() => import(/* webpackChunkName: "view-home" */ './views/Home.vue'))
+const Register = defineAsyncComponent(() => import(/* webpackChunkName: "view-register" */ './views/Register.vue'))
+const VendorDashboard = defineAsyncComponent(() => import(/* webpackChunkName: "view-vendor-dashboard" */ './views/VendorDashboard.vue'))
+const AdminDashboard = defineAsyncComponent(() => import(/* webpackChunkName: "view-admin-dashboard" */ './views/AdminDashboard.vue'))
+const Products = defineAsyncComponent(() => import(/* webpackChunkName: "view-products" */ './views/Products.vue'))
+const Cart = defineAsyncComponent(() => import(/* webpackChunkName: "view-cart" */ './views/Cart.vue'))
+const OrderConfirmation = defineAsyncComponent(() => import(/* webpackChunkName: "view-order-confirmation" */ './views/OrderConfirmation.vue'))
+const Orders = defineAsyncComponent(() => import(/* webpackChunkName: "view-orders" */ './views/Orders.vue'))
+const SignIn = defineAsyncComponent(() => import(/* webpackChunkName: "view-signin" */ './views/SignIn.vue'))
+const PendingApproval = defineAsyncComponent(() => import(/* webpackChunkName: "view-pending-approval" */ './views/PendingApproval.vue'))
+const ForgotPassword = defineAsyncComponent(() => import(/* webpackChunkName: "view-forgot-password" */ './views/ForgotPassword.vue'))
+const ResetPassword = defineAsyncComponent(() => import(/* webpackChunkName: "view-reset-password" */ './views/ResetPassword.vue'))
+const VerifyEmail = defineAsyncComponent(() => import(/* webpackChunkName: "view-verify-email" */ './views/VerifyEmail.vue'))
 
 export default {
   name: 'App',
