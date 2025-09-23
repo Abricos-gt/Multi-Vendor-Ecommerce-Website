@@ -1,6 +1,6 @@
 <div align="center">
 
-#Multi-Vendor Marketplace App (Vue + Flask)
+# Multi-Vendor Marketplace App (Vue + Flask)
 
 Operational marketplace with multi-vendor catalogs, Chapa payments, admin dashboards, analytics and real-time updates.
 
