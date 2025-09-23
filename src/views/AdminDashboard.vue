@@ -63,16 +63,16 @@
       <div v-if="currentTab === 'dashboard'" class="tab-content">
         <div class="stats-cards">
           <div class="stat-card">
-            <h3>Registered Vendors</h3>
-            <p>{{ apps.length }}</p>
+            <h3>Total Orders</h3>
+            <p>{{ orderSummary.total }}</p>
           </div>
           <div class="stat-card">
-            <h3>Approved Vendors</h3>
-            <p>{{ approvedVendorsCount }}</p>
+            <h3>Pending</h3>
+            <p style="color:#d97706">{{ orderSummary.pending }}</p>
           </div>
           <div class="stat-card">
-            <h3>Total Products</h3>
-            <p>{{ products.length }}</p>
+            <h3>Completed</h3>
+            <p style="color:#059669">{{ orderSummary.completed }}</p>
           </div>
         </div>
 
@@ -747,6 +747,7 @@ export default {
       refunds: [],
       adminOrders: [],
       ordersLoading: false,
+      orderSummary: { total: 0, pending: 0, completed: 0, cancelled: 0, paid: 0, failed: 0 },
       carouselSlides: [],
       showAddSlideModal: false,
       showEditSlideModal: false,
@@ -877,8 +878,8 @@ export default {
     }
   },
   async mounted() {
-    await Promise.all([this.loadApplications(), this.loadProducts(), this.loadRefunds(), this.loadCarouselSlides(), this.loadAdminOrders()])
-    try { this._adminOrdersPoll = setInterval(()=> this.loadAdminOrders(), 15000) } catch(_) { /* ignore */ }
+    await Promise.all([this.loadApplications(), this.loadProducts(), this.loadRefunds(), this.loadCarouselSlides(), this.loadAdminOrders(), this.loadOrderSummary()])
+    try { this._adminOrdersPoll = setInterval(()=> { this.loadAdminOrders(); this.loadOrderSummary() }, 15000) } catch(_) { /* ignore */ }
     this.loadSettings()
     this.loadCategories()
   },
@@ -935,6 +936,10 @@ export default {
       try{ this.ordersLoading = true; const { data } = await http.get('/admin/orders?range=30d'); this.adminOrders = Array.isArray(data)? data: [] }
       catch{ this.adminOrders = [] }
       finally{ this.ordersLoading = false }
+    },
+    async loadOrderSummary(){
+      try { const { data } = await http.get('/api/analytics/orders_summary'); if (data && !data.error) this.orderSummary = data }
+      catch { /* ignore transient errors */ }
     },
     async updateRefundStatus(refundId, status, adminNotes = '') {
       try {

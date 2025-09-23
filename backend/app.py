@@ -135,17 +135,7 @@ def initiate_chapa_payment(amount: float, currency: str, customer: dict, tx_ref:
     first_name = (customer.get('first_name') or customer.get('name') or 'Customer').strip() or 'Customer'
     last_name = (customer.get('last_name') or '').strip()
     phone_number = (customer.get('phone') or '').strip()
-    # Ensure return URL includes tx_ref for redirecting to order confirmation, unless disabled
-    return_url = None
-    if not CHAPA_DISABLE_RETURN:
-        try:
-            ru = CHAPA_RETURN_URL
-            sep = '&' if '?' in ru else '?'
-            if 'tx_ref=' not in ru:
-                ru = f"{ru}{sep}tx_ref={tx_ref}"
-        except Exception:
-            ru = CHAPA_RETURN_URL
-        return_url = ru
+    # Intentionally omit return_url so Chapa stays on receipt page
 
     payload = {
         'amount': f"{amount:.2f}",
@@ -157,8 +147,6 @@ def initiate_chapa_payment(amount: float, currency: str, customer: dict, tx_ref:
         'tx_ref': tx_ref,
         'callback_url': CHAPA_CALLBACK_URL,
     }
-    if return_url:
-        payload['return_url'] = return_url
     try:
         resp = requests.post(f"{CHAPA_BASE_URL}/v1/transaction/initialize", headers=_chapa_headers(), json=payload, timeout=20)
         try:
@@ -2798,6 +2786,94 @@ def set_default_address(user_id, address_id):
         
     except Exception as e:
         return jsonify({'error': f'Failed to set default address: {e}'}), 500
+
+# ----------------------
+# Analytics & Admin Orders
+# ----------------------
+
+@app.get('/api/analytics/orders_summary')
+def analytics_orders_summary():
+    """Return order counters: total, pending, completed, cancelled, paid, failed."""
+    try:
+        total = db.session.query(db.func.count(Order.id)).scalar() or 0
+        pending = db.session.query(db.func.count(Order.id)).filter(Order.status == 'pending').scalar() or 0
+        completed = db.session.query(db.func.count(Order.id)).filter(Order.status == 'completed').scalar() or 0
+        cancelled = db.session.query(db.func.count(Order.id)).filter(Order.status == 'cancelled').scalar() or 0
+        paid = db.session.query(db.func.count(Order.id)).filter(Order.payment_status == 'paid').scalar() or 0
+        failed = db.session.query(db.func.count(Order.id)).filter(Order.payment_status == 'failed').scalar() or 0
+        return jsonify({
+            'total': total,
+            'pending': pending,
+            'completed': completed,
+            'cancelled': cancelled,
+            'paid': paid,
+            'failed': failed,
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to load summary: {e}'}), 500
+
+@app.get('/api/analytics/sales_over_time')
+def analytics_sales_over_time():
+    """Return daily totals for last N days. Query: days=30, metric=amount|count"""
+    try:
+        days = int(request.args.get('days') or 30)
+        metric = (request.args.get('metric') or 'amount').lower()
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        rows = db.session.query(
+            db.func.date(Order.created_at).label('day'),
+            db.func.sum(Order.total_amount).label('amount'),
+            db.func.count(Order.id).label('count')
+        ).filter(Order.created_at >= cutoff).group_by(db.func.date(Order.created_at)).order_by(db.func.date(Order.created_at)).all()
+        labels = []
+        values = []
+        for day, amount, count in rows:
+            labels.append(str(day))
+            values.append(float(amount or 0) if metric == 'amount' else int(count or 0))
+        return jsonify({'labels': labels, 'values': values, 'metric': metric})
+    except Exception as e:
+        return jsonify({'error': f'Failed to load sales: {e}'}), 500
+
+@app.get('/api/analytics/top_categories')
+def analytics_top_categories():
+    """Top categories by order count."""
+    try:
+        q = db.session.query(
+            Product.category.label('category'),
+            db.func.count(OrderItem.id).label('orders')
+        ).join(Product, OrderItem.product_id == Product.id).join(Order, OrderItem.order_id == Order.id).group_by(Product.category).order_by(db.func.count(OrderItem.id).desc()).limit(10)
+        rows = q.all()
+        return jsonify([{'category': c or 'Uncategorized', 'orders': int(n or 0)} for c, n in rows])
+    except Exception as e:
+        return jsonify({'error': f'Failed to load categories: {e}'}), 500
+
+@app.get('/admin/orders')
+def admin_orders_list():
+    """List recent orders for admin. Query: range=30d|7d|1d, limit=50"""
+    try:
+        rng = (request.args.get('range') or '30d').lower()
+        limit = min(int(request.args.get('limit') or 50), 200)
+        days = 30
+        if rng.endswith('d'):
+            try: days = int(rng[:-1])
+            except Exception: days = 30
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        orders = Order.query.filter(Order.created_at >= cutoff).order_by(Order.created_at.desc()).limit(limit).all()
+        out = []
+        for o in orders:
+            out.append({
+                'id': o.id,
+                'user_id': o.user_id,
+                'total_amount': o.total_amount,
+                'status': o.status,
+                'payment_status': o.payment_status,
+                'payment_method': o.payment_method,
+                'payment_reference': o.payment_reference,
+                'receipt_url': o.receipt_url,
+                'created_at': o.created_at.isoformat() if o.created_at else None
+            })
+        return jsonify(out)
+    except Exception as e:
+        return jsonify({'error': f'Failed to load orders: {e}'}), 500
 
 if __name__ == '__main__':
     with app.app_context():

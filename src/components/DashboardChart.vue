@@ -10,7 +10,7 @@
       <Pie :data="appsStatusData" :options="appsStatusOptions" />
     </div>
     <div class="chart-card">
-      <Radar :data="productsByVendorData" :options="productsByVendorOptions" />
+      <Bar :data="topVendorsData" :options="topVendorsOptions" />
     </div>
     <div class="chart-card">
       <Line :data="productsOverTimeData" :options="productsOverTimeOptions" />
@@ -42,7 +42,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js'
-import { Bar, Doughnut, Line, Pie, PolarArea, Radar } from 'vue-chartjs'
+import { Bar, Doughnut, Line, Pie, PolarArea } from 'vue-chartjs'
 
 ChartJS.register(
   CategoryScale,
@@ -60,7 +60,7 @@ ChartJS.register(
 
 export default {
   name: 'DashboardChart',
-  components: { Bar, Doughnut, Line, Pie, PolarArea, Radar },
+  components: { Bar, Doughnut, Line, Pie, PolarArea },
   props: {
     stats: {
       type: Object,
@@ -72,6 +72,8 @@ export default {
     refunds: { type: Array, default: () => [] }
   },
   computed: {
+    // Filters scaffolding (no UI here; parent can pass filtered arrays)
+    // stats, apps, products, refunds are expected to be pre-filtered by parent
     barData() {
       const labels = ['Registered Vendors', 'Approved Vendors', 'Total Products']
       const values = [this.stats.registered || 0, this.stats.approved || 0, this.stats.products || 0]
@@ -158,14 +160,16 @@ export default {
         }
       }
     },
-    productsByVendorData() {
+    // Top Vendors: horizontal bar with top 5 vendors by product count
+    topVendorsData() {
       const map = new Map()
       for (const p of this.products) {
         const key = p && (p.vendor_name || p.vendor_user_id || 'Unknown')
         map.set(key, (map.get(key) || 0) + 1)
       }
-      const labels = Array.from(map.keys()).map(v => String(v))
-      const values = Array.from(map.values())
+      const entries = Array.from(map.entries()).sort((a,b)=>b[1]-a[1]).slice(0,5)
+      const labels = entries.map(([k]) => String(k))
+      const values = entries.map(([,v]) => v)
       return {
         labels,
         datasets: [
@@ -173,20 +177,22 @@ export default {
             label: 'Products',
             backgroundColor: '#60a5fa',
             borderColor: '#3b82f6',
-            data: values
+            data: values,
+            borderRadius: 6
           }
         ]
       }
     },
-    productsByVendorOptions() {
+    topVendorsOptions() {
       return {
+        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          title: { display: true, text: 'Products per Vendor', font: { size: 14, weight: '700' } }
+          title: { display: true, text: 'Top 5 Vendors by Products', font: { size: 14, weight: '700' } }
         },
-        scales: { r: { angleLines: { color: '#eef2f7' }, grid: { color: '#eef2f7' }, pointLabels: { color: '#475569' } } }
+        scales: { x: { beginAtZero: true, grid: { color: '#eef2f7' } }, y: { grid: { display: false } } }
       }
     },
     // New: Products over time (by month)
@@ -252,7 +258,7 @@ export default {
     refundsByStatusOptions() {
       return { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } }, title: { display: true, text: 'Refunds by Status', font: { size: 14, weight: '700' } } } }
     },
-    // New: Applications over time
+    // New: Vendor Applications over time with simple moving average (window=3)
     applicationsOverTimeData() {
       const buckets = new Map()
       for (const a of this.apps) {
@@ -263,10 +269,24 @@ export default {
       }
       const labels = Array.from(buckets.keys()).sort()
       const values = labels.map(k => buckets.get(k))
-      return { labels, datasets: [{ label: 'Applications', backgroundColor: '#34d399', borderColor: '#10b981', data: values }] }
+      // moving average (window 3)
+      const window = 3
+      const ma = values.map((_,i)=>{
+        const start = Math.max(0, i-window+1)
+        const slice = values.slice(start, i+1)
+        const sum = slice.reduce((s,n)=>s+n,0)
+        return +(sum / slice.length).toFixed(2)
+      })
+      return {
+        labels,
+        datasets: [
+          { label: 'Vendor Applications', backgroundColor: 'rgba(16,185,129,0.15)', borderColor: '#10b981', pointBackgroundColor: '#10b981', fill: true, tension: 0.35, data: values },
+          { label: 'Moving Avg (3)', borderColor: '#059669', pointRadius: 0, tension: 0.25, data: ma }
+        ]
+      }
     },
     applicationsOverTimeOptions() {
-      return { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: 'Vendor Applications Over Time' } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+      return { responsive: true, maintainAspectRatio: false, plugins: { legend: { position:'bottom' }, title: { display: true, text: 'Vendor Applications (with Moving Average)' } }, interaction:{mode:'index',intersect:false}, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#eef2f7' } } } }
     }
   }
 }
