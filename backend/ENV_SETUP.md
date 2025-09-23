@@ -16,8 +16,8 @@ To make the password reset functionality work, you need to set up email credenti
 3. **Set Environment Variables**:
    ```bash
    # Windows (PowerShell)
-   $env:EMAIL_USER="your-email@gmail.com"
-   $env:EMAIL_PASSWORD="your-16-char-app-password"
+   $env:EMAIL_USER="abrishg.tesfamichael@gmail.com"
+   $env:EMAIL_PASSWORD="zusd suma okcx cmml"
    $env:EMAIL_HOST="smtp.gmail.com"
    $env:EMAIL_PORT="587"
 

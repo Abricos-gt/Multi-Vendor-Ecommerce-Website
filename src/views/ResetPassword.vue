@@ -1,56 +1,61 @@
-<template>
+ <template>
   <div class="reset-password">
     <div class="reset-password__card">
       <h2>Reset Password</h2>
-      <p class="reset-password__description">
-        Enter your new password below.
-      </p>
-      
-      <form @submit.prevent="resetPassword" class="reset-password__form">
-        <div class="form__group">
-          <label for="newPassword" class="form__label">New Password</label>
+
+      <p v-if="status === 'idle'">Enter your new password.</p>
+      <p v-if="status === 'sending'">Updating password...</p>
+      <p v-if="status === 'success'" class="success">Password updated successfully! Redirecting to login...</p>
+      <p v-if="status === 'error'" class="error">{{ error }}</p>
+
+      <form v-if="status === 'idle' || status === 'error'" @submit.prevent="resetPassword">
+
+        <!-- New Password -->
+        <div class="password-input">
           <input
-            id="newPassword"
-            v-model="newPassword"
-            type="password"
-            class="form__input"
-            placeholder="Enter new password"
+            :type="showPassword ? 'text' : 'password'"
+            v-model="password"
+            placeholder="New password"
             required
-            minlength="6"
           />
+          <button type="button" class="toggle-btn" @click="showPassword = !showPassword">
+            <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+          </button>
         </div>
-        
-        <div class="form__group">
-          <label for="confirmPassword" class="form__label">Confirm Password</label>
+
+        <!-- Confirm Password -->
+        <div class="password-input">
           <input
-            id="confirmPassword"
+            :type="showConfirmPassword ? 'text' : 'password'"
             v-model="confirmPassword"
-            type="password"
-            class="form__input"
-            placeholder="Confirm new password"
+            placeholder="Confirm password"
             required
-            minlength="6"
           />
+          <button type="button" class="toggle-btn" @click="showConfirmPassword = !showConfirmPassword">
+            <i :class="showConfirmPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+          </button>
         </div>
-        
-        <button type="submit" class="form__button" :disabled="isLoading || !isValid">
-          {{ isLoading ? 'Updating...' : 'Update Password' }}
+
+        <!-- Password Validation List (after confirm password) -->
+        <ul class="password-hints">
+          <li :class="{ valid: password.length >= 8 }">At least 8 characters</li>
+          <li :class="{ valid: /[A-Z]/.test(password) }">1 uppercase letter</li>
+          <li :class="{ valid: /[0-9]/.test(password) }">1 number</li>
+          <li :class="{ valid: /[!@#$%^&*]/.test(password) }">1 special character (!@#$%^&*)</li>
+        </ul>
+
+        <p v-if="confirmPassword && password !== confirmPassword" class="error">
+          Passwords do not match.
+        </p>
+
+        <button
+          class="btn primary"
+          type="submit"
+          :disabled="status === 'sending' || password !== confirmPassword || !isPasswordValid"
+        >
+          {{ status === 'sending' ? 'Updating...' : 'Reset Password' }}
         </button>
-        
-        <div v-if="error" class="form__error">
-          {{ error }}
-        </div>
-        
-        <div v-if="success" class="form__success">
-          {{ success }}
-        </div>
       </form>
-      
-      <div class="reset-password__footer">
-        <a href="#/signin" class="reset-password__link">
-          Back to Sign In
-        </a>
-      </div>
     </div>
   </div>
 </template>
@@ -62,62 +67,62 @@ export default {
   name: 'ResetPassword',
   data() {
     return {
-      newPassword: '',
+      password: '',
       confirmPassword: '',
-      isLoading: false,
+      showPassword: false,
+      showConfirmPassword: false,
+      status: 'idle',
       error: '',
-      success: '',
       token: ''
     }
   },
   computed: {
-    isValid() {
-      return this.newPassword.length >= 6 && this.newPassword === this.confirmPassword
+    isPasswordValid() {
+      return (
+        this.password.length >= 8 &&
+        /[A-Z]/.test(this.password) &&
+        /[0-9]/.test(this.password) &&
+        /[!@#$%^&*]/.test(this.password)
+      )
     }
   },
-  created() {
-    // Get token from URL query parameter
+  mounted() {
     const urlParams = new URLSearchParams(window.location.search)
-    this.token = urlParams.get('token')
-    
-    if (!this.token) {
-      this.error = 'Invalid reset link. Please request a new password reset.'
-    }
+    this.token = urlParams.get('token') || ''
   },
   methods: {
     async resetPassword() {
-      if (!this.isValid) {
-        this.error = 'Passwords must match and be at least 6 characters long.'
+      this.status = 'sending'
+      this.error = ''
+
+      if (!this.isPasswordValid) {
+        this.error = 'Password does not meet criteria.'
+        this.status = 'error'
         return
       }
-      
-      this.isLoading = true
-      this.error = ''
-      this.success = ''
-      
+
+      if (this.password !== this.confirmPassword) {
+        this.error = 'Passwords do not match.'
+        this.status = 'error'
+        return
+      }
+
       try {
         await http.post('/auth/reset-password', {
           token: this.token,
-          new_password: this.newPassword
+          new_password: this.password
         })
-        
-        this.success = 'Password updated successfully! You can now sign in with your new password.'
-        this.newPassword = ''
-        this.confirmPassword = ''
-        
-        // Redirect to sign in after 3 seconds
+
+        this.status = 'success'
+
+        // Redirect to login page using hash-based routing
         setTimeout(() => {
           window.location.hash = '#/signin'
-        }, 3000)
-        
-      } catch (error) {
-        if (error.response?.status === 400) {
-          this.error = error.response?.data?.error || 'Invalid request. Please check your input.'
-        } else {
-          this.error = error.response?.data?.error || error.message || 'Failed to update password'
-        }
-      } finally {
-        this.isLoading = false
+        }, 1500)
+
+      } catch (err) {
+        this.error = err.response?.data?.error || 'Failed to reset password.'
+        this.status = 'error'
       }
     }
   }
@@ -125,133 +130,63 @@ export default {
 </script>
 
 <style scoped>
-.reset-password {
-  min-height: 100vh;
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+.reset-password { display:flex; justify-content:center; align-items:center; min-height:100vh; background: var(--bg-secondary, #f1f5f9); }
+
+.reset-password__card { background: var(--card-bg, #ffffff); padding: 40px; border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.15); width: 100%; max-width: 520px; text-align: center; box-sizing: border-box; }
+
+.password-input {
+  position: relative;
+  margin-bottom: 15px;
+}
+
+.password-input input { width: 100%; padding: 12px 45px 12px 12px; border-radius: 8px; border: 1px solid var(--border-color, #cbd5e1); background: var(--card-bg, #ffffff); color: var(--text-primary, #111827); font-size: 16px; box-sizing: border-box; }
+.password-input input:focus { outline:none; border-color: var(--accent-color, #37A000); box-shadow: 0 0 0 3px rgba(55,160,0,0.20); }
+
+.toggle-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 18px;
+  padding: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  transition: color 0.2s, transform 0.2s;
 }
 
-.reset-password__card {
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  padding: 40px;
-  width: 100%;
-  max-width: 480px;
-  text-align: center;
-}
+.toggle-btn:hover { color: var(--accent-color, #37A000); transform: translateY(-50%) scale(1.2); }
 
-.reset-password__card h2 {
-  margin: 0 0 8px;
-  color: #1f2937;
-  font-size: 28px;
-  font-weight: 700;
-}
-
-.reset-password__description {
-  margin: 0 0 32px;
-  color: #6b7280;
-  font-size: 16px;
-  line-height: 1.5;
-}
-
-.reset-password__form {
+.password-hints {
   text-align: left;
-  margin-bottom: 24px;
-}
-
-.form__group {
-  margin-bottom: 24px;
-}
-
-.form__label {
-  display: block;
-  margin-bottom: 8px;
-  color: #374151;
-  font-weight: 600;
+  margin-bottom: 15px;
+  padding-left: 20px;
   font-size: 14px;
 }
 
-.form__input {
-  width: 100%;
-  padding: 12px 16px;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: all 0.2s ease;
-  box-sizing: border-box;
+.password-hints li {
+  color: #6b7280;
 }
 
-.form__input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
+.password-hints li.valid { color: var(--accent-color, #37A000); font-weight: 600; }
 
-.form__button {
-  width: 100%;
-  padding: 14px 24px;
-  background: #3b82f6;
-  color: #ffffff;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: 16px;
-}
+.error { color: #dc2626; margin-bottom: 10px; }
+.success { color: var(--accent-color, #37A000); margin-bottom: 10px; }
 
-.form__button:hover:not(:disabled) {
-  background: #2563eb;
-  transform: translateY(-1px);
-}
-
-.form__button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.form__error {
-  background: #fee2e2;
+.error {
   color: #dc2626;
-  padding: 12px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  margin-top: 16px;
+  margin-bottom: 10px;
 }
 
-.form__success {
-  background: #d1fae5;
-  color: #059669;
-  padding: 12px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  margin-top: 16px;
-}
-
-.reset-password__footer {
-  text-align: center;
-}
-
-.reset-password__link {
-  color: #3b82f6;
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.2s ease;
-}
-
-.reset-password__link:hover {
-  color: #2563eb;
-  text-decoration: underline;
-}
-
-@media (max-width: 480px) {
-  .reset-password__card {
-    padding: 24px;
-  }
+.success {
+  color: #16a34a;
+  margin-bottom: 10px;
 }
 </style>

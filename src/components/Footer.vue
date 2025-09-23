@@ -1,115 +1,187 @@
 <template>
-  <footer class="site-footer">
+  <footer class="footer">
     <div class="footer__container">
+      <!-- Brand -->
       <div class="footer__brand">
-        <a href="#/products" class="footer__logo">MultiVendor</a>
-        <p class="footer__tag">Your multi‑vendor marketplace.</p>
+        <h2 class="footer__logo"><span class="brand-em">Afra</span><span class="brand-sub">Shop</span></h2>
+        <p class="footer__desc">Your one-stop shop for quality products with fast and secure payments.</p>
       </div>
 
-      <div class="footer__grid">
-        <div class="footer__col">
-          <h4>Shop</h4>
-          <ul>
-            <li><a href="#/products">Products</a></li>
-            <li><a href="#/cart">Cart</a></li>
-            <li><a href="#/orders">Orders</a></li>
-          </ul>
-        </div>
-        <div class="footer__col">
-          <h4>Vendors</h4>
-          <ul>
-            <li><a href="#/vendor">Become a vendor</a></li>
-            <li><a href="#/vendor">Vendor dashboard</a></li>
-          </ul>
-        </div>
-        <div class="footer__col">
-          <h4>Company</h4>
-          <ul>
-            <li><a href="#/register">Register</a></li>
-            <li><a href="#/admin">Admin</a></li>
-          </ul>
-        </div>
+      <!-- Contact -->
+      <div class="footer__section">
+        <h3 class="footer__heading">Contact Us</h3>
+        <ul class="footer__list">
+          <li><i class="fas fa-phone-alt"></i> +251 911 123456</li>
+          <li><i class="fas fa-envelope"></i> support@afrashop.com</li>
+          <li><i class="fas fa-map-marker-alt"></i> Mekelle, Ethiopia</li>
+        </ul>
       </div>
 
-      <div class="footer__bottom">
-        <div class="footer__copy">© {{ year }} MultiVendor. All rights reserved.</div>
-        <div class="footer__social">
-          <a href="#" aria-label="Twitter" class="social__btn">T</a>
-          <a href="#" aria-label="Facebook" class="social__btn">F</a>
-          <a href="#" aria-label="Instagram" class="social__btn">I</a>
+      <!-- Support -->
+      <div class="footer__section">
+        <h3 class="footer__heading">Support</h3>
+        <ul class="footer__list">
+          <li><a href="#/faq">FAQ</a></li>
+          <li><a href="#/help">Help Center</a></li>
+          <li><a href="#/returns">Returns</a></li>
+        </ul>
+      </div>
+
+      <!-- Payment -->
+      <div class="footer__section">
+        <h3 class="footer__heading">Payment Methods</h3>
+        <div class="footer__payments">
+          <span class="payment-badge">Telebirr</span>
+          <span class="payment-badge">CBE</span>
+          <span class="payment-badge">Mpesa</span>
         </div>
       </div>
+    </div>
+
+    <div class="footer__bottom">
+      <p>© 2025 AfraShop. All rights reserved.</p>
     </div>
   </footer>
 </template>
 
 <script>
 export default {
-  name: 'Footer',
-  computed: {
-    year() {
-      return new Date().getFullYear()
-    }
-  }
-}
+  name: "Footer",
+};
 </script>
 
 <style scoped>
-.site-footer, .site-footer * { box-sizing: border-box; }
-.site-footer {
-  margin-top: 40px;
-  background: var(--footer-bg, #1e293b); /* Distinct from page background */
-  color: var(--footer-text, #cbd5e1);
-  border-top: 1px solid var(--footer-border, #334155);
+.footer {
+  background: #0f172a;
+  color: #cbd5e1;
+  padding: 50px 20px 20px;
+  font-family: "Segoe UI", Roboto, sans-serif;
 }
+
 .footer__container {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 16px;
-}
-.footer__brand { margin-bottom: 16px; }
-.footer__logo { color: var(--footer-logo, #ffffff); font-weight: 700; text-decoration: none; font-size: 20px; }
-.footer__tag { margin: 8px 0 0; color: var(--footer-tag, #94a3b8); }
-
-.footer__grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-  margin: 16px 0 24px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 40px;
 }
-.footer__col h4 { color: var(--footer-heading, #ffffff); margin: 0 0 8px; font-size: 14px; }
-.footer__col ul { list-style: none; padding: 0; margin: 0; }
-.footer__col a { color: var(--footer-link, #cbd5e1); text-decoration: none; }
-.footer__col a:hover { color: var(--footer-link-hover, #ffffff); }
 
-.footer__bottom {
-  border-top: 1px solid var(--footer-border, #334155);
-  padding-top: 16px;
+.footer__brand {
+  grid-column: span 2;
+}
+
+.footer__logo {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 30px;
+  font-weight: 900;
+  color: #ffffff;
+  margin-bottom: 10px;
+}
+.footer__logo::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: -6px;
+  width: 54px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(55,160,0,0.0), rgba(55,160,0,0.9), rgba(55,160,0,0.0));
+}
+.brand-em { font-weight: 900; color: #37A000; text-shadow: 0 2px 8px rgba(55,160,0,0.35); }
+.brand-sub { font-weight: 700; background: linear-gradient(90deg, #e2fbe8 0%, #ffffff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: transparent; }
+
+.footer__desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #94a3b8;
+}
+
+.footer__section {
+  display: flex;
+  flex-direction: column;
+}
+
+.footer__heading {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 12px;
+  border-left: 3px solid #1e90ff;
+  padding-left: 8px;
+}
+
+.footer__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.footer__list li {
+  margin-bottom: 8px;
+  font-size: 14px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
+}
+
+.footer__list li i {
+  color: #1e90ff;
+}
+
+.footer__list li a {
+  color: #cbd5e1;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer__list li a:hover {
+  color: #ffffff;
+}
+
+.footer__payments {
+  display: flex;
+  gap: 10px;
   flex-wrap: wrap;
 }
-.footer__copy { font-size: 14px; color: var(--footer-copy, #94a3b8); }
-.footer__social { display: inline-flex; gap: 8px; }
-.social__btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px; height: 32px;
-  border: 1px solid var(--footer-border, #334155);
-  border-radius: 8px;
-  color: var(--footer-link, #cbd5e1); text-decoration: none;
-}
-.social__btn:hover { 
-  background: var(--footer-border, #334155); 
-  color: var(--footer-link-hover, #ffffff); 
+
+.payment-badge {
+  background-color: #1e293b;
+  color: #1e90ff;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+  cursor: default;
 }
 
-@media (min-width: 768px) {
-  .footer__grid { grid-template-columns: repeat(3, 1fr); }
+.payment-badge:hover {
+  background-color: #1e90ff;
+  color: #ffffff;
+}
+
+.footer__bottom {
+  text-align: center;
+  margin-top: 40px;
+  border-top: 1px solid #334155;
+  padding-top: 15px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+/* Mobile Responsive */
+@media (max-width: 767px) {
+  .footer__brand {
+    grid-column: span 1;
+    text-align: center;
+  }
+
+  .footer__payments {
+    justify-content: center;
+  }
 }
 </style>
-
-

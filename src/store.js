@@ -1,6 +1,36 @@
 // Simple localStorage-backed store for demo purposes
 const STORAGE_KEY = 'mv_store_v1'
 
+function serializeState(s) {
+  // Persist only lightweight, essential data to avoid quota issues
+  return {
+    user: s.user,
+    vendorApplications: s.vendorApplications,
+    products: s.products, // Add products to persisted state
+    cart: s.cart,
+    lastOrder: s.lastOrder,
+    orders: s.orders
+  }
+}
+
+function safeSetItem(key, value) {
+  try {
+    localStorage.setItem(key, value)
+    return true
+  } catch (e) {
+    // Try to free the key and retry
+    try { localStorage.removeItem(key) } catch (_) { /* ignore */ }
+    try {
+      localStorage.setItem(key, value)
+      return true
+    } catch (_) {
+      // Fallback to sessionStorage (non-persistent, but prevents crash)
+      try { sessionStorage.setItem(key, value) } catch (_) { /* ignore */ }
+      return false
+    }
+  }
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -13,14 +43,14 @@ function loadState() {
 }
 
 function saveState(state) {
-  console.log('Store: Saving state:', state)
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  try {
-    console.log('Store: Dispatching mv:store:update event')
-    window.dispatchEvent(new CustomEvent('mv:store:update'))
-  } catch (_) { 
-    console.error('Store: Failed to dispatch event')
+  const payload = JSON.stringify(serializeState(state))
+  const ok = safeSetItem(STORAGE_KEY, payload)
+  if (!ok) {
+    console.warn('Store: Falling back after quota issue. Saved to sessionStorage or minimal state only.')
   }
+  try {
+    window.dispatchEvent(new CustomEvent('mv:store:update'))
+  } catch (_) { /* ignore */ }
 }
 
 function getDefaultState() {
@@ -50,7 +80,9 @@ const store = {
         id: userData.id,
         name: userData.name || `${userData.first_name} ${userData.last_name}`.trim(),
         email: userData.email,
-        role: userData.role || 'user'
+        role: userData.role || 'user',
+        email_verified: Boolean(userData.email_verified),
+        account_status: userData.account_status || 'active'
       }
     } else {
       // Legacy format for demo
@@ -152,15 +184,70 @@ const store = {
   // Sync products from backend API
   setProducts(products) {
     // products: [{ id, vendor_user_id, name, description, price, image_url }]
+    let optionsMap = {}
+    try { optionsMap = JSON.parse(localStorage.getItem('mv_product_options') || '{}') } catch (_) { optionsMap = {} }
     state.products = (products || []).map(p => ({
       id: p.id,
       vendorUserId: p.vendor_user_id,
       name: p.name,
       description: p.description,
       price: Number(p.price) || 0,
-      imageUrl: p.image_url || p.imageUrl || ''
+      imageUrl: p.image_url || p.imageUrl || '',
+      colors: (() => {
+        const fromApi = Array.isArray(p.colors) ? p.colors : (typeof p.colors === 'string' ? p.colors.split(',').map(s=>s.trim()).filter(Boolean) : (Array.isArray(p.colorOptions) ? p.colorOptions : []))
+        if (fromApi && fromApi.length) return fromApi
+        const local = optionsMap[p.id]?.colors
+        return Array.isArray(local) ? local : []
+      })(),
+      sizes: (() => {
+        const fromApi = Array.isArray(p.sizes) ? p.sizes : (typeof p.sizes === 'string' ? p.sizes.split(',').map(s=>s.trim()).filter(Boolean) : (Array.isArray(p.sizeOptions) ? p.sizeOptions : []))
+        if (fromApi && fromApi.length) return fromApi
+        const local = optionsMap[p.id]?.sizes
+        return Array.isArray(local) ? local : []
+      })()
     }))
     saveState(state)
+  },
+  addProductToStore(product) {
+    // Add a single product to the store without replacing existing products
+    let optionsMap = {}
+    try { optionsMap = JSON.parse(localStorage.getItem('mv_product_options') || '{}') } catch (_) { optionsMap = {} }
+    
+    const processedProduct = {
+      id: product.id,
+      vendorUserId: product.vendor_user_id || product.vendor_id,
+      name: product.name,
+      description: product.description,
+      price: Number(product.price) || 0,
+      imageUrl: product.image_url || product.imageUrl || '',
+      colors: (() => {
+        const fromApi = Array.isArray(product.colors) ? product.colors : (typeof product.colors === 'string' ? product.colors.split(',').map(s=>s.trim()).filter(Boolean) : (Array.isArray(product.colorOptions) ? product.colorOptions : []))
+        if (fromApi && fromApi.length) return fromApi
+        const local = optionsMap[product.id]?.colors
+        return Array.isArray(local) ? local : []
+      })(),
+      sizes: (() => {
+        const fromApi = Array.isArray(product.sizes) ? product.sizes : (typeof product.sizes === 'string' ? product.sizes.split(',').map(s=>s.trim()).filter(Boolean) : (Array.isArray(product.sizeOptions) ? product.sizeOptions : []))
+        if (fromApi && fromApi.length) return fromApi
+        const local = optionsMap[product.id]?.sizes
+        return Array.isArray(local) ? local : []
+      })(),
+      brand: product.brand || '',
+      made: product.made || '',
+      stock: Number(product.stock_quantity) || 0,
+      rating: Number(product.rating) || 0,
+      isFeatured: Boolean(product.is_featured) || false
+    }
+    
+    // Check if product already exists, if so update it, otherwise add it
+    const existingIndex = state.products.findIndex(p => p.id === product.id)
+    if (existingIndex !== -1) {
+      state.products[existingIndex] = processedProduct
+    } else {
+      state.products.push(processedProduct)
+    }
+    
+    console.log('Store: Added/updated product', processedProduct.id)
   },
 
   // Cart
@@ -220,14 +307,56 @@ const store = {
   listCartItems() {
     const items = state.cart.map(i => {
       const p = state.products.find(pr => pr.id === i.productId)
+      // console.log('Store: Cart item lookup', { productId: i.productId, found: !!p })
       return {
         ...i,
-        product: p || { name: 'Unknown', description: '', price: 0, imageUrl: '' },
+        product: p || { name: 'Unknown', description: '', price: 0, imageUrl: '', image_url: '' },
         lineTotal: (p ? p.price : 0) * i.quantity
       }
     })
-    console.log('Store: Cart items', items)
     return items
+  },
+  async refreshMissingProducts() {
+    // Check if any cart items have missing product data
+    const missingProductIds = state.cart
+      .map(i => i.productId)
+      .filter(id => !state.products.find(p => p.id === id))
+    
+    if (missingProductIds.length === 0) return
+    
+    console.log('Store: Refreshing missing products for cart', missingProductIds)
+    
+    try {
+      // Fetch missing products from API
+      const http = (await import('../http')).default
+      const promises = missingProductIds.map(id => 
+        http.get(`/products/${id}`).catch(() => null)
+      )
+      const results = await Promise.all(promises)
+      
+      // Add found products to store
+      results.forEach(result => {
+        if (result && result.data) {
+          this.addProductToStore(result.data)
+        }
+      })
+    } catch (error) {
+      console.error('Store: Failed to refresh missing products', error)
+      // Optionally remove items that can't be resolved
+      // this.removeUnresolvableCartItems()
+    }
+  },
+  removeUnresolvableCartItems() {
+    // Remove cart items that reference products that don't exist
+    const originalLength = state.cart.length
+    state.cart = state.cart.filter(item => 
+      state.products.find(p => p.id === item.productId)
+    )
+    const removedCount = originalLength - state.cart.length
+    if (removedCount > 0) {
+      console.log(`Store: Removed ${removedCount} unresolvable cart items`)
+      saveState(state)
+    }
   },
 
   // Checkout (stub)

@@ -1,0 +1,40 @@
+{
+  "vendor": {
+    "approvalMode": "manual",
+    "maxProductsPerVendor": 25,
+    "requireEmailVerification": true,
+    "requireId": true,
+    "requireLicense": true
+  },
+  "commission": {
+    "minPayout": 50,
+    "payoutSchedule": "monthly",
+    "ratePercent": 10
+  },
+  "orders": {
+    "cancellationAllowed": true,
+    "orderAutoExpireMins": 30,
+    "refundWindowDays": 14
+  },
+  "shipping": {
+    "defaultRate": 5,
+    "freeShipThreshold": 100,
+    "regions": "US, EU"
+  },
+  "security": {
+    "lockoutMinutes": 15,
+    "loginAttemptLimit": 3
+  },
+  "email": {
+    "from": "",
+    "host": "",
+    "port": 587,
+    "useSSL": false,
+    "useTLS": true,
+    "username": ""
+  },
+  "appearance": {
+    "primaryColor": "#1e90ff",
+    "theme": "system"
+  }
+}
