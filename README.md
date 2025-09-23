@@ -1,12 +1,40 @@
 <div align="center">
 
-# Marketplace App (Vue + Flask)
+# 🛍️ Marketplace App (Vue + Flask)
 
-Operational marketplace with multi-vendor catalogs, Chapa payments, admin dashboards, analytics and real-time updates.
+Operational marketplace with multi‑vendor catalogs, Chapa payments, admin dashboards, analytics and real‑time updates.
+
+<p>
+  <img src="src/assets/logo.png" alt="App logo" height="64" />
+</p>
+
+<p>
+  <a href="#"><img src="https://img.shields.io/badge/Vue-%2329C485.svg?logo=vue.js&logoColor=white" alt="Vue"/></a>
+  <a href="#"><img src="https://img.shields.io/badge/Flask-%23000000.svg?logo=flask&logoColor=white" alt="Flask"/></a>
+  <a href="#"><img src="https://img.shields.io/badge/Chapa-Payments-blueviolet" alt="Chapa"/></a>
+  <a href="#license"><img src="https://img.shields.io/badge/License-MIT-green" alt="MIT"/></a>
+  <a href="#quick-start"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs welcome"/></a>
+  
+</p>
 
 </div>
 
-## Overview
+## 📚 Table of Contents
+
+- [Overview](#overview)
+- [Screenshots](#screenshots)
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Payment Flow (Chapa)](#payment-flow-chapa)
+- [Analytics Endpoints](#analytics-endpoints)
+- [Admin Dashboard](#admin-dashboard)
+- [Project Structure](#project-structure)
+- [Security Notes](#security-notes)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+- [Author](#author)
+
+## 🧭 Overview
 
 Purpose: A multi‑vendor ecommerce platform where multiple vendors can register, list and sell their products, while customers browse, cart, and checkout. Admins manage vendors, catalog, orders, refunds, and monitor performance with built‑in analytics.
 
@@ -15,7 +43,7 @@ Purpose: A multi‑vendor ecommerce platform where multiple vendors can register
 - Payments: Chapa checkout with webhook/callback verification.
 - Dashboards: Admin analytics (orders summary, sales over time, top categories), vendor management, refunds.
 
-## Features
+## ✨ Features
 
 - Multi-vendor cart → single or per‑vendor order creation
 - Chapa payment initialization, callback verification, and optional return URL suppression
@@ -24,7 +52,7 @@ Purpose: A multi‑vendor ecommerce platform where multiple vendors can register
 - Vendor applications review and product management
 - Refund requests and processing
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1) Prerequisites
 
@@ -73,7 +101,7 @@ python backend/app.py
 
 Backend runs on `http://localhost:5000` by default.
 
-## Payment Flow (Chapa)
+## 💳 Payment Flow (Chapa)
 
 1. Place Order (pending):
    - `POST /payments/checkout` creates order(s) and returns `checkout_url`.
@@ -86,14 +114,14 @@ Backend runs on `http://localhost:5000` by default.
 4. Order Confirmation Page:
    - `#/order-confirmation` shows verification result and audit trail.
 
-## Analytics Endpoints
+## 📈 Analytics Endpoints
 
 - `GET /api/analytics/orders_summary` → `{ total, pending, completed, cancelled, paid, failed }`
 - `GET /api/analytics/sales_over_time?days=30&metric=amount|count` → `{ labels, values, metric }`
 - `GET /api/analytics/top_categories` → array of `{ category, orders }`
 - `GET /admin/orders?range=30d&limit=50` → recent orders list
 
-## Admin Dashboard
+## 🧩 Admin Dashboard
 
 - Counters: total, pending, completed (auto-refresh every 15s)
 - Recent Orders table (auto-refresh every 15s)
@@ -102,7 +130,7 @@ Backend runs on `http://localhost:5000` by default.
   - Vendor Applications (line + 3-period moving average)
   - Products over time, products by category, refunds by status
 
-## Development Scripts
+## 🧪 Development Scripts
 
 ```bash
 npm run serve       # start frontend dev server
@@ -110,7 +138,7 @@ npm run build       # production build
 npm run lint        # lint and fix
 ```
 
-## Project Structure
+## 🗂️ Project Structure
 
 ```
 backend/               Flask app, models, payments, analytics
@@ -125,23 +153,35 @@ src/                   Vue SPA source
 public/                Static assets
 ```
 
-## Security Notes
+## 🔒 Security Notes
 
 - Never expose `CHAPA_SECRET_KEY` on the frontend. Use backend only.
 - Validate webhook authenticity if Chapa provides signatures.
 - Sanitize and validate user inputs on both client and server.
 
-## Troubleshooting
+## 🛠️ Troubleshooting
 
 - No redirect after checkout: verify backend is running and `POST /payments/checkout` returns `checkout_url`.
 - Want to stay on Chapa receipt screen: set `CHAPA_DISABLE_RETURN=true` and restart backend.
 - Order not updating after payment: ensure `CHAPA_CALLBACK_URL` is reachable and configured in Chapa; check backend logs for callback errors.
 
-## License
+## 📄 License
 
 MIT
 
-## Author
+## 👤 Author
 
 Abrha Gebrehiwet Tesfamichael
+
+## 🖼️ Screenshots
+
+<div align="center">
+
+<img src="backend/uploads/carousel/online-shopping-1929002_1280_783202ba.png" alt="Home / Hero" width="800" />
+
+<img src="backend/uploads/carousel/miniature-silver-shopping-cart-on-a-black-keyboard_76cd280c.jpg" alt="Promotions" width="800" />
+
+</div>
+
+Tip: Replace or add real screenshots under `public/` or `docs/` and update the paths above for a polished gallery. You can also export views (e.g., Admin Dashboard, Cart, Order Confirmation) as PNGs for better documentation.
 
