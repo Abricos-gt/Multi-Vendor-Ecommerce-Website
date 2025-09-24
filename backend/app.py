@@ -1,4 +1,6 @@
 import os
+import hmac
+import hashlib
 import traceback
 import secrets
 import json
@@ -35,6 +37,7 @@ CHAPA_BASE_URL = os.getenv('CHAPA_BASE_URL', 'https://api.chapa.co')
 CHAPA_RETURN_URL = os.getenv('CHAPA_RETURN_URL', 'http://localhost:8085/#/order-confirmation')
 CHAPA_CALLBACK_URL = os.getenv('CHAPA_CALLBACK_URL', 'http://localhost:5000/payments/chapa/callback')
 CHAPA_OFFLINE = os.getenv('CHAPA_OFFLINE', 'false').lower() in ('1','true','yes','on')
+CHAPA_WEBHOOK_SECRET = os.getenv('CHAPA_WEBHOOK_SECRET', '').strip()
 CHAPA_DISABLE_RETURN = os.getenv('CHAPA_DISABLE_RETURN', 'false').lower() in ('1','true','yes','on')
 
 # Log key presence at startup for easier diagnostics
@@ -511,8 +514,30 @@ def admin_migrate():
         changes = []
         if engine_name == 'sqlite':
             if _sqlite_has_column('order', 'parent_order_id') is False:
-                db.session.execute('ALTER TABLE "order" ADD COLUMN parent_order_id INTEGER')
-                changes.append('order.parent_order_id')
+                try:
+                    db.session.execute(text('ALTER TABLE "order" ADD COLUMN parent_order_id INTEGER'))
+                    changes.append('order.parent_order_id')
+                except Exception as ex:
+                    if 'duplicate column name' not in str(ex).lower():
+                        raise
+            if _sqlite_has_column('order', 'receipt_url') is False:
+                try:
+                    db.session.execute(text('ALTER TABLE "order" ADD COLUMN receipt_url VARCHAR(300)'))
+                    changes.append('order.receipt_url')
+                except Exception as ex:
+                    if 'duplicate column name' not in str(ex).lower():
+                        raise
+            # Create helpful indexes to speed up queries
+            try:
+                db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_product_category ON product (category)'))
+                changes.append('idx_product_category')
+            except Exception:
+                pass
+            try:
+                db.session.execute(text('CREATE INDEX IF NOT EXISTS idx_product_created_at ON product (created_at)'))
+                changes.append('idx_product_created_at')
+            except Exception:
+                pass
         db.session.commit()
         return jsonify({'ok': True, 'changes': changes})
     except Exception as e:
@@ -1998,6 +2023,19 @@ def set_order_payment_method(order_id):
 def chapa_callback():
     """Chapa server-to-server callback to confirm payment and update order."""
     try:
+        # Basic signature verification if a webhook secret is configured.
+        # Many gateways send a signature in header like 'X-Chapa-Signature'.
+        # We compute HMAC-SHA256 over raw body with CHAPA_WEBHOOK_SECRET.
+        raw_body = request.get_data() or b''
+        sig_header = request.headers.get('X-Chapa-Signature') or request.headers.get('x-chapa-signature')
+        if CHAPA_WEBHOOK_SECRET:
+            try:
+                digest = hmac.new(CHAPA_WEBHOOK_SECRET.encode('utf-8'), raw_body, hashlib.sha256).hexdigest()
+                if not sig_header or not hmac.compare_digest(digest, sig_header.strip()):
+                    return jsonify({'error': 'Invalid webhook signature'}), 401
+            except Exception:
+                return jsonify({'error': 'Signature verification failed'}), 401
+
         data = request.get_json(silent=True) or request.form.to_dict() or {}
         tx_ref = data.get('tx_ref') or data.get('reference') or ''
         status = data.get('status') or ''
@@ -2008,6 +2046,12 @@ def chapa_callback():
         parent = ParentOrder.query.filter_by(tx_ref=tx_ref).first()
         if not order and not parent:
             return jsonify({'error': 'Order not found for tx_ref'}), 404
+
+        # Idempotency: if already paid, exit early
+        if order and order.payment_status == 'paid':
+            return jsonify({'ok': True, 'message': 'Already processed', 'tx_ref': tx_ref})
+        if parent and parent.status == 'paid':
+            return jsonify({'ok': True, 'message': 'Already processed', 'tx_ref': tx_ref})
 
         verify_resp = verify_chapa_transaction(tx_ref)
         if verify_resp.get('error'):
@@ -2035,7 +2079,7 @@ def chapa_callback():
             # mark all child orders paid/confirmed
             children = Order.query.filter_by(parent_order_id=parent.id).all()
             for ch in children:
-                ch.status = 'confirmed'
+                ch.status = 'completed'
                 ch.payment_status = 'paid'
                 ch.updated_at = datetime.utcnow()
                 try:
@@ -2043,7 +2087,7 @@ def chapa_callback():
                 except Exception:
                     pass
         if order:
-            order.status = 'confirmed'
+            order.status = 'completed'
             order.payment_status = 'paid'
             order.updated_at = datetime.utcnow()
             try:
@@ -2163,11 +2207,11 @@ def api_verify_payment():
                 parent.updated_at = datetime.utcnow()
                 children = Order.query.filter_by(parent_order_id=parent.id).all()
                 for ch in children:
-                    ch.status = 'confirmed'
+                    ch.status = 'completed'
                     ch.payment_status = 'paid'
                     ch.updated_at = datetime.utcnow()
             if order:
-                order.status = 'confirmed'
+                order.status = 'completed'
                 order.payment_status = 'paid'
                 order.updated_at = datetime.utcnow()
             db.session.commit()
@@ -2261,6 +2305,50 @@ def api_payment_status():
         return jsonify(trail)
     except Exception as e:
         return jsonify({'error': f'Status failed: {e}'}), 500
+
+# ----------------------
+# Admin: Reconcile pending Chapa payments (manual/cron)
+# ----------------------
+
+@app.post('/admin/payments/reconcile')
+def admin_reconcile_payments():
+    """Verify recent pending Chapa orders and update their status.
+
+    Query params:
+      hours: how far back to look (default 24)
+      limit: max orders to process (default 50)
+    """
+    try:
+        hours = int(request.args.get('hours') or 24)
+        limit = min(int(request.args.get('limit') or 50), 500)
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        candidates = Order.query.filter(
+            Order.payment_method == 'chapa',
+            Order.payment_status.in_(['pending', None]),
+            Order.created_at >= cutoff,
+            Order.payment_reference.isnot(None)
+        ).order_by(Order.created_at.desc()).limit(limit).all()
+
+        reconciled = []
+        for o in candidates:
+            tx_ref = (o.payment_reference or '').strip()
+            if not tx_ref:
+                continue
+            v = verify_chapa_transaction(tx_ref)
+            v_status = (v.get('status') or '').lower()
+            v_data = v.get('data') or {}
+            paid_ok = (v_status == 'success') and ((v_data.get('status') or '').lower() == 'success')
+            if paid_ok:
+                o.status = 'completed'
+                o.payment_status = 'paid'
+                o.updated_at = datetime.utcnow()
+                reconciled.append(o.id)
+        if reconciled:
+            db.session.commit()
+        return jsonify({'ok': True, 'checked': len(candidates), 'updated': len(reconciled), 'orders': reconciled})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Reconcile failed: {e}'}), 500
 
 @app.get('/admin/settings')
 def get_admin_settings():
@@ -2797,7 +2885,10 @@ def analytics_orders_summary():
     try:
         total = db.session.query(db.func.count(Order.id)).scalar() or 0
         pending = db.session.query(db.func.count(Order.id)).filter(Order.status == 'pending').scalar() or 0
-        completed = db.session.query(db.func.count(Order.id)).filter(Order.status == 'completed').scalar() or 0
+        # Treat confirmed (paid) as completed for dashboard purposes
+        completed = db.session.query(db.func.count(Order.id)).filter(
+            db.or_(Order.status.in_(['confirmed','completed']), Order.payment_status == 'paid')
+        ).scalar() or 0
         cancelled = db.session.query(db.func.count(Order.id)).filter(Order.status == 'cancelled').scalar() or 0
         paid = db.session.query(db.func.count(Order.id)).filter(Order.payment_status == 'paid').scalar() or 0
         failed = db.session.query(db.func.count(Order.id)).filter(Order.payment_status == 'failed').scalar() or 0
@@ -2874,6 +2965,30 @@ def admin_orders_list():
         return jsonify(out)
     except Exception as e:
         return jsonify({'error': f'Failed to load orders: {e}'}), 500
+
+@app.get('/vendors/<int:vendor_id>/orders')
+def vendor_orders(vendor_id: int):
+    """List orders scoped to a specific vendor by joining order_items and products."""
+    try:
+        q = db.session.query(
+            OrderItem, Order, Product
+        ).join(Order, OrderItem.order_id == Order.id).join(Product, OrderItem.product_id == Product.id).filter(Product.vendor_id == vendor_id).order_by(Order.created_at.desc()).limit(200)
+        rows = q.all()
+        out = []
+        for oi, o, p in rows:
+            out.append({
+                'order_id': o.id,
+                'product_id': oi.product_id,
+                'product_name': p.name,
+                'quantity': oi.quantity,
+                'price': oi.price,
+                'status': o.status,
+                'payment_status': o.payment_status,
+                'created_at': o.created_at.isoformat() if o.created_at else None
+            })
+        return jsonify(out)
+    except Exception as e:
+        return jsonify({'error': f'Failed to load vendor orders: {e}'}), 500
 
 if __name__ == '__main__':
     with app.app_context():

@@ -26,6 +26,7 @@ Operational marketplace with multi‑vendor catalogs, Chapa payments, admin dash
 - [Features](#features)
 - [Quick Start](#quick-start)
 - [Payment Flow (Chapa)](#payment-flow-chapa)
+- [End-to-End Marketplace Flow](#end-to-end-marketplace-flow)
 - [Analytics Endpoints](#analytics-endpoints)
 - [Admin Dashboard](#admin-dashboard)
 - [Project Structure](#project-structure)
@@ -113,6 +114,33 @@ Backend runs on `http://localhost:5000` by default.
    - Idempotent: safe on duplicate callbacks.
 4. Order Confirmation Page:
    - `#/order-confirmation` shows verification result and audit trail.
+
+## 🔁 End-to-End Marketplace Flow
+
+Actors: Customer (buyer), Vendor(s), Admin.
+
+1) Checkout & Order Creation
+- User places order → backend creates `orders` + `order_items` (each item stores `vendor_id`).
+- `status = pending_payment`, generate unique `tx_ref` (sent to Chapa).
+- Optionally redirect to Chapa `checkout_url`.
+
+2) Payment Confirmation
+- Chapa completes payment, then:
+  - Redirects user (optional)
+  - Sends webhook to `/payments/chapa/callback` with the same `tx_ref`.
+
+3) Webhook Handling (backend)
+- Verify signature (HMAC with `CHAPA_WEBHOOK_SECRET`).
+- Look up order by `tx_ref`, verify via Chapa `verify` API, update:
+  - `orders.status = confirmed`, `orders.payment_status = paid` (idempotent safe).
+- Ensure `order_items.vendor_id` is set from products for vendor mapping.
+
+4) Notifications & Dashboards
+- Vendor: latest orders where their `vendor_id` appears in `order_items`.
+- User: "My Orders" shows status Paid/Processing.
+- Admin: Orders table + analytics auto-update (counters, sales over time).
+
+Real-time: start with polling endpoints, optionally upgrade to WebSockets.
 
 ## 📈 Analytics Endpoints
 

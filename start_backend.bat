@@ -8,6 +8,8 @@ set "CHAPA_RETURN_URL=http://localhost:8085/#/order-confirmation"
 set "CHAPA_CALLBACK_URL=http://localhost:5000/payments/chapa/callback"
 REM Set this to true to keep user on Chapa receipt page (no redirect back)
 set "CHAPA_DISABLE_RETURN=false"
+REM If set, verify webhook signatures (X-Chapa-Signature = HMAC-SHA256(raw-body, CHAPA_WEBHOOK_SECRET))
+set "CHAPA_WEBHOOK_SECRET=REPLACE_WITH_WEBHOOK_SECRET"
 
 cd backend
 python app.py

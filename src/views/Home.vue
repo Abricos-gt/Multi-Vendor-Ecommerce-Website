@@ -8,8 +8,8 @@
   <section class="page">
     <div class="carousel" v-if="slides && slides.length">
       <div class="carousel__viewport">
-        <div class="carousel__track" :style="trackStyle">
-          <div class="carousel__slide" v-for="(s, idx) in slides" :key="idx">
+        <div class="carousel__track" :class="{ 'is-looping': looping }" :style="looping ? {'--loop-duration': loopDuration + 's'} : trackStyle">
+          <div class="carousel__slide" v-for="(s, idx) in (looping ? loopSlides : slides)" :key="'sl'+idx">
             <img class="carousel__img" :src="s.image" :alt="(s.title[lang]||s.title.en)" />
             <div class="carousel__overlay"></div>
             <div class="carousel__caption">
@@ -19,9 +19,9 @@
             </div>
           </div>
         </div>
-        <button v-if="slides.length > 1" class="carousel__nav prev" @click="prevSlide" aria-label="Previous">‹</button>
-        <button v-if="slides.length > 1" class="carousel__nav next" @click="nextSlide" aria-label="Next">›</button>
-        <div v-if="slides.length > 1" class="carousel__dots">
+        <button v-if="!looping && slides.length > 1" class="carousel__nav prev" @click="prevSlide" aria-label="Previous">‹</button>
+        <button v-if="!looping && slides.length > 1" class="carousel__nav next" @click="nextSlide" aria-label="Next">›</button>
+        <div v-if="!looping && slides.length > 1" class="carousel__dots">
           <button v-for="(s, i) in slides" :key="'d'+i" :class="['dot', { active: i===currentSlide }]" @click="goSlide(i)" :aria-label="'Go to slide '+(i+1)" />
         </div>
       </div>
@@ -144,16 +144,25 @@ export default {
   },
   computed: {
     ctaText(){ return this.lang==='ti' ? 'እቶ ምድላይ' : 'Shop Now' },
-    trackStyle(){ return { transform: `translateX(-${this.currentSlide * 100}%)` } },
+    trackStyle(){ return this.looping ? {} : { transform: `translateX(-${this.currentSlide * 100}%)` } },
     visibleProducts(){
       if (!this.selectedCategory) return this.featured
       return this.featured.filter(p => (p.category || '').toLowerCase() === (this.selectedCategory || '').toLowerCase())
+    },
+    looping(){
+      try { return (this.slides && this.slides.length > 1) } catch { return false }
+    },
+    loopDuration(){
+      try { const n = Math.max(1, (this.slides||[]).length); return n * 4 } catch { return 8 }
+    },
+    loopSlides(){
+      try { return [...(this.slides||[]), ...(this.slides||[])] } catch { return [] }
     }
   },
   methods: {
     formatETB,
     loadLang(){ try{ const v = localStorage.getItem('mv_lang'); if (v) this.lang = v }catch(_){ /* ignore */ } },
-    startAuto(){ try{ this.stopAuto(); if ((this.slides||[]).length > 1) { this._t = setInterval(()=> this.nextSlide(), 5000) } }catch(_){ /* ignore */ } },
+    startAuto(){ try{ this.stopAuto(); if (!this.looping && (this.slides||[]).length > 1) { this._t = setInterval(()=> this.nextSlide(), 5000) } }catch(_){ /* ignore */ } },
     stopAuto(){ try{ if (this._t) clearInterval(this._t) }catch(_){ /* ignore */ } this._t=null },
     nextSlide(){ this.currentSlide = (this.currentSlide + 1) % this.slides.length },
     prevSlide(){ this.currentSlide = (this.currentSlide - 1 + this.slides.length) % this.slides.length },
@@ -533,6 +542,7 @@ html, body { overflow-x: hidden; }
 .carousel{ margin: 12px 0 16px }
 .carousel__viewport{ position: relative; border-radius: 16px; overflow: hidden; border:1px solid #e5e7eb }
 .carousel__track{ display:flex; width:100%; transition: transform .5s ease }
+.carousel__track.is-looping{ width: auto; animation: slide-loop var(--loop-duration, 8s) linear infinite }
 .carousel__slide{ min-width:100%; position: relative; height: 200px; background:#0b1f27 }
 @media(min-width: 900px){ .carousel__slide{ height: 280px } }
 @media(max-width: 768px){ 
@@ -565,6 +575,11 @@ html, body { overflow-x: hidden; }
 @keyframes floatCaption {
   0% { transform: translateY(0px); }
   100% { transform: translateY(-3px); }
+}
+
+@keyframes slide-loop {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
 /* Toast Notification Styles */
