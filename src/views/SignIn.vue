@@ -124,6 +124,7 @@ export default {
 <style scoped>
 .signin-container { display:flex; justify-content:center; align-items:center; min-height: 80vh; padding: 24px; background: var(--bg-secondary, #f1f5f9); }
 .signin-card { width:100%; max-width:460px; background: var(--card-bg, #ffffff); border:1px solid var(--border-color, #e5e7eb); border-radius:16px; padding:32px; box-shadow: 0 10px 28px rgba(0,0,0,0.10); }
+@media(max-width: 480px){ .signin-card{ padding:20px } .btn{ width:100% } }
 .signin-title { text-align:center; margin:0 0 6px; font-size:26px; font-weight:800; color: var(--text-primary, #111827); }
 .signin-subtitle { text-align:center; margin:0 0 18px; color: var(--text-secondary, #6b7280); font-size:14px; }
 .signin-form { display:grid; gap:14px; }

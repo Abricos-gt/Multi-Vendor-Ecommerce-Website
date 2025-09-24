@@ -814,13 +814,14 @@ export default {
 @media (max-width: 768px) {
   .navbar__nav {
     position: absolute;
-    top: 96px;
+    top: calc(36px + 96px);
     left: 0;
     right: 0;
     background: var(--navbar-bg, #1d4354);
     transform-origin: top;
     transform: scaleY(0);
     transition: transform 0.2s ease-out;
+    z-index: 999; /* sit above content */
   }
   .navbar__nav.is-open { transform: scaleY(1); }
   .navbar__list {
@@ -828,6 +829,9 @@ export default {
     padding: 12px 16px;
     gap: 12px;
   }
+  .navbar__container { flex-wrap: wrap; height: auto; padding: 12px 0; gap: 10px; }
+  .navbar__search { order: 3; width: 100%; max-width: none; }
+  .search__wrap { width: 100%; }
   .navbar__themeToggle { width: 36px; height: 36px; }
   .theme-icon { width: 18px; height: 18px; }
   .utility__container { flex-wrap: wrap; }

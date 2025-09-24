@@ -331,6 +331,7 @@ export default {
   flex-direction: column;
   align-items: center; /* center everything inside */
 }
+@media(max-width: 480px){ .register-card{ padding:22px } .register-form .form-row{ flex-direction: column; gap: 12px } .btn.primary{ width:100% } }
 
 .register-title {
   font-size: 30px; /* slightly bigger */
