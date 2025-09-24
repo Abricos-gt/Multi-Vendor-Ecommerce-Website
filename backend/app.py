@@ -78,6 +78,27 @@ mail = Mail(app)
 # Configure CORS
 CORS(app, origins=CORS_ORIGINS)
 
+# ----------------------
+# Health check
+# ----------------------
+@app.route('/healthz', methods=['GET'])
+def healthz():
+    try:
+        # Quick DB check (optional): run lightweight SELECT 1 for SQL-based backends
+        try:
+            with db.engine.connect() as connection:
+                connection.execute(text('SELECT 1'))
+        except Exception:
+            # If DB is not reachable, still return 200 to indicate app is up
+            pass
+        return jsonify({
+            'status': 'ok',
+            'version': os.getenv('APP_VERSION', 'v1'),
+            'time': datetime.utcnow().isoformat() + 'Z'
+        }), 200
+    except Exception:
+        return jsonify({'status': 'error'}), 500
+
 # Commerce settings
 COMMISSION_RATE = float(os.getenv('COMMISSION_RATE', '0.10'))
 
