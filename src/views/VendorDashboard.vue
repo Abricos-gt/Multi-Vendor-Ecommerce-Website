@@ -653,10 +653,20 @@ export default {
       }
     },
     loadCategories(){
-      try {
-        const raw = localStorage.getItem('mv_admin_categories')
-        this.categories = raw ? JSON.parse(raw) : []
-      } catch { this.categories = [] }
+      (async ()=>{
+        try {
+          const { data } = await http.get('/admin/categories')
+          if (Array.isArray(data)) {
+            this.categories = data
+            try { localStorage.setItem('mv_admin_categories', JSON.stringify(data)) } catch(_){ /* ignore localStorage quota */ }
+            return
+          }
+        } catch(e){ /* backend categories fetch failed; will fallback to localStorage */ }
+        try {
+          const raw = localStorage.getItem('mv_admin_categories')
+          this.categories = raw ? JSON.parse(raw) : []
+        } catch (e) { this.categories = [] }
+      })()
     },
     startEdit(p) { 
       if (!this.isApproved) {

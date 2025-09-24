@@ -1062,10 +1062,17 @@ export default {
       if(!this.approveTarget) return
       try { 
         await http.post(`/vendors/applications/${this.approveTarget.id}/status`, {status:'approved'})
-        await this.loadApplications()
+        // Optimistic update
+        const idx = this.apps.findIndex(a => a.id === this.approveTarget.id)
+        if (idx !== -1) this.$set ? this.$set(this.apps[idx], 'status', 'approved') : (this.apps[idx].status = 'approved')
         this.closeApproveModal()
         this.showNotification('success','Vendor approved!')
-      } catch(e){ this.showNotification('error','Failed to approve') }
+        // Refresh in background to ensure consistency
+        this.loadApplications()
+      } catch(e){ 
+        const msg = (e && e.response && (e.response.data?.error || e.response.data?.message)) || e.message || 'Failed to approve'
+        this.showNotification('error', msg)
+      }
     },
     openRejectModal(app) { this.rejectTarget = app; this.rejectModalOpen = true },
     closeRejectModal() { this.rejectModalOpen = false; this.rejectTarget = null },
@@ -1073,10 +1080,17 @@ export default {
       if(!this.rejectTarget) return
       try { 
         await http.post(`/vendors/applications/${this.rejectTarget.id}/status`, {status:'rejected'})
-        await this.loadApplications()
+        // Optimistic update
+        const idx = this.apps.findIndex(a => a.id === this.rejectTarget.id)
+        if (idx !== -1) this.$set ? this.$set(this.apps[idx], 'status', 'rejected') : (this.apps[idx].status = 'rejected')
         this.closeRejectModal()
         this.showNotification('success','Vendor rejected!')
-      } catch(e){ this.showNotification('error','Failed to reject') }
+        // Refresh in background to ensure consistency
+        this.loadApplications()
+      } catch(e){ 
+        const msg = (e && e.response && (e.response.data?.error || e.response.data?.message)) || e.message || 'Failed to reject'
+        this.showNotification('error', msg)
+      }
     },
     openDeleteModal(p) { this.confirmTarget = p; this.confirmOpen = true },
     closeDeleteModal() { this.confirmOpen = false; this.confirmTarget = null },

@@ -138,7 +138,8 @@ export default {
       categories: [],
       featured: [],
       recently: [],
-      showRecently: false
+      showRecently: false,
+      loadingProducts: false
     }
   },
   computed: {
@@ -174,22 +175,44 @@ export default {
       try { window.location.hash = `#/products/${id}` } catch (_) { window.location.href = `#/products/${id}` }
     },
     loadCategories(){
-      try { const raw = localStorage.getItem('mv_admin_categories'); this.categories = raw ? JSON.parse(raw) : [] } catch { this.categories = [] }
+      // Try backend first, then fallback to localStorage
+      (async ()=>{
+        try {
+          const { data } = await http.get('/admin/categories')
+          if (Array.isArray(data)) {
+            this.categories = data
+            try { localStorage.setItem('mv_admin_categories', JSON.stringify(data)) } catch (_) { /* ignore localStorage quota */ }
+            return
+          }
+        } catch (_) { /* backend categories fetch failed; will fallback to localStorage */ }
+        try { const raw = localStorage.getItem('mv_admin_categories'); this.categories = raw ? JSON.parse(raw) : [] } catch { this.categories = [] }
+      })()
     },
     async loadFeatured(){
       try { 
-        // Use optimized featured products endpoint
-        const { data } = await http.get('/products/featured'); 
-        console.log('Home: Featured products from API:', data);
-        
+        this.loadingProducts = true
+        // Try cache first for instant paint
+        const key = 'mv_products_' + (this.selectedCategory || 'all')
+        try {
+          const cached = JSON.parse(localStorage.getItem(key) || 'null')
+          if (Array.isArray(cached) && cached.length) {
+            this.featured = cached
+          }
+        } catch(_) { /* ignore cache parse */ }
+        // Fetch products for current category selection (or all)
+        const params = { limit: 24 }
+        if (this.selectedCategory) { params.category = this.selectedCategory }
+        const { data } = await http.get('/products', { params })
         // Sync products with store so cart can find them
         store.setProducts(data || []);
-        
         this.featured = data || [];
-        console.log('Home: Loaded featured products count:', this.featured.length);
+        // Update cache
+        try { localStorage.setItem(key, JSON.stringify(this.featured)) } catch(_) { /* ignore quota */ }
       } catch (error) { 
-        console.error('Home: Error loading featured products:', error);
+        console.error('Home: Error loading products:', error);
         this.featured = [] 
+      } finally {
+        this.loadingProducts = false
       }
     },
     
@@ -230,12 +253,14 @@ export default {
     filterByCategory(category) {
       this.selectedCategory = category;
       try { localStorage.setItem('mv_selected_category', category) } catch (_) { /* ignore */ }
-      // stay on Home and highlight active chip
+      // reload products according to selected category
+      this.loadFeatured()
     },
     viewAllProducts() {
       this.selectedCategory = null;
       try { localStorage.removeItem('mv_selected_category') } catch (_) { /* ignore */ }
-      // stay on Home
+      // reload products for all categories
+      this.loadFeatured()
     },
     clearCategoryFilter() {
       this.selectedCategory = null;
