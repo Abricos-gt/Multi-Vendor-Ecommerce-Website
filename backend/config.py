@@ -4,8 +4,28 @@ from urllib.parse import quote_plus
 # Database Configuration
 # Prefer DATABASE_URL if provided; otherwise build from PG* vars to avoid URL encoding issues
 _database_url_env = os.getenv('DATABASE_URL', '').strip()
+def _normalize_database_url(url: str) -> str:
+    try:
+        if not url:
+            return url
+        # Normalize scheme for SQLAlchemy
+        if url.startswith('postgres://'):
+            url = 'postgresql://' + url[len('postgres://'):]
+        # Prefer explicit driver if missing
+        if url.startswith('postgresql://') and '+psycopg2' not in url.split('://', 1)[0]:
+            url = 'postgresql+psycopg2://' + url[len('postgresql://'):]
+        # Ensure sslmode=require when missing
+        if url.startswith('postgresql'):  # covers postgresql+psycopg2
+            lower = url.lower()
+            if 'sslmode=' not in lower:
+                sep = '&' if '?' in url else '?'
+                url = f"{url}{sep}sslmode=require"
+        return url
+    except Exception:
+        return url
+
 if _database_url_env:
-    DATABASE_URL = _database_url_env
+    DATABASE_URL = _normalize_database_url(_database_url_env)
 else:
     _pg_host = os.getenv('PGHOST')
     _pg_port = os.getenv('PGPORT', '5432')
