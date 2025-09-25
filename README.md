@@ -230,7 +230,7 @@ Abrha Gebrehiwet Tesfamichael
 
 <img src="public/screenshots/home.png" alt="Home" width="800" />
 
-<img src="public/screenshots/admin-dashboard.png" alt="Admin Dashboard" width="800" />
+<img src="public/screenshots/products.png" alt="Admin Dashboard" width="800" />
 
 </div>
 
