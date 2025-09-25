@@ -28,6 +28,14 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 280,
+    'pool_size': int(os.getenv('SQL_POOL_SIZE', '5')),
+    'max_overflow': int(os.getenv('SQL_MAX_OVERFLOW', '10')),
+    'pool_timeout': int(os.getenv('SQL_POOL_TIMEOUT', '30')),
+    'connect_args': { 'sslmode': 'require' }
+}
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
 
