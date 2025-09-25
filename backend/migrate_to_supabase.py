@@ -1,7 +1,8 @@
 import os
 import sys
 from typing import List
-from sqlalchemy import create_engine, MetaData, Table, text
+from sqlalchemy import create_engine, MetaData, Table, text, select
+from sqlalchemy.sql.sqltypes import Integer, Boolean, Float, Numeric, DateTime
 from sqlalchemy.engine import Engine
 
 
@@ -43,24 +44,56 @@ def enable_triggers(engine: Engine, tables: List[Table], schema: str | None = No
         pass
 
 
-def copy_table(source_engine: Engine, dest_engine: Engine, table: Table) -> None:
-    columns = [c.name for c in table.columns]
-    select_sql = text(f"SELECT {', '.join(columns)} FROM {table.name}")
-    insert_sql = text(
-        f"INSERT INTO {table.name} ({', '.join(columns)}) VALUES ({', '.join(':'+c for c in columns)})"
-    )
+def _pg_type_for(sqlite_col) -> str:
+    t = sqlite_col.type
+    # Map common SQLite types to Postgres
+    if isinstance(t, Integer):
+        return 'INTEGER'
+    if isinstance(t, (Float, Numeric)):
+        return 'NUMERIC'
+    if isinstance(t, Boolean):
+        return 'BOOLEAN'
+    if isinstance(t, DateTime):
+        return 'TIMESTAMP'
+    # Default to TEXT for anything else (incl. VARCHAR, TEXT, BLOB)
+    return 'TEXT'
 
+def ensure_table_exists_in_postgres(dest_engine: Engine, src_table: Table) -> None:
+    col_defs = []
+    pk_cols = [c.name for c in src_table.primary_key.columns] if src_table.primary_key else []
+    for c in src_table.columns:
+        pg_type = _pg_type_for(c)
+        col_sql = f'"{c.name}" {pg_type}'
+        # Simple NOT NULL if reflected as nullable=False
+        if not c.nullable:
+            col_sql += ' NOT NULL'
+        col_defs.append(col_sql)
+    pk_sql = f', PRIMARY KEY ({", ".join(f"\"{n}\"" for n in pk_cols)})' if pk_cols else ''
+    ddl = f'CREATE TABLE IF NOT EXISTS "{src_table.name}" ({", ".join(col_defs)}{pk_sql})'
+    with dest_engine.begin() as conn:
+        conn.execute(text(ddl))
+
+def copy_table(source_engine: Engine, dest_engine: Engine, src_table: Table, dest_table: Table) -> None:
+    # Pull rows from source using SQLAlchemy Core to avoid manual quoting
     with source_engine.connect() as s_conn:
-        rows = s_conn.execute(select_sql).mappings().all()
+        rows = s_conn.execute(select(src_table)).mappings().all()
         if not rows:
             return
 
-    # bulk insert in chunks
+    # Bulk insert into destination using table.insert() which handles quoting
     chunk_size = 1000
     with dest_engine.begin() as d_conn:
         for i in range(0, len(rows), chunk_size):
             chunk = rows[i : i + chunk_size]
-            d_conn.execute(insert_sql, chunk)
+            try:
+                d_conn.execute(dest_table.insert(), chunk)
+            except Exception:
+                # Best-effort: insert row-by-row and skip duplicates or FK failures
+                for r in chunk:
+                    try:
+                        d_conn.execute(dest_table.insert(), r)
+                    except Exception:
+                        pass
 
 
 def main() -> int:
@@ -82,6 +115,8 @@ def main() -> int:
 
     # Create tables on destination if they don't exist
     # Note: Reflection from SQLite may not carry FKs perfectly; run your own migrations beforehand if available
+    # Prefer that destination schema is already created via your app models.
+    # If not, best-effort create based on reflected SQLite metadata.
     try:
         src_md.create_all(dest, checkfirst=True)
     except Exception as e:
@@ -91,13 +126,52 @@ def main() -> int:
     tables = list(src_md.sorted_tables)
     disable_triggers(dest, tables)
 
+    # Reflect destination tables to ensure proper quoting and types
+    dest_md = MetaData()
+    dest_md.reflect(bind=dest)
+
+    # Copy in dependency-safe order where possible
+    preferred_order = [
+        'user',
+        'product',
+        'parent_order',
+        'order',
+        'order_item',
+        'sub_order',
+        'sub_order_item',
+        'vendor_application',
+        'vendor_wallet',
+        'wallet_ledger',
+        'withdrawal_request',
+        'refund',
+        'email_verification_token',
+        'password_reset_token',
+        'payment_audit',
+        'admin_settings',
+        'carousel_slide',
+    ]
+
+    # Build ordered list of tables present
+    ordered_tables = [t for name in preferred_order for t in tables if t.name == name]
+    # Append any remaining tables not listed explicitly
+    ordered_tables += [t for t in tables if t not in ordered_tables]
+
     try:
-        for table in tables:
-            print(f'Copying table: {table.name}')
+        for src_table in ordered_tables:
+            print(f'Copying table: {src_table.name}')
             try:
-                copy_table(source, dest, table)
+                dest_table = dest_md.tables.get(src_table.name)
+                if dest_table is None:
+                    # Create a compatible table in Postgres, then reflect it
+                    try:
+                        ensure_table_exists_in_postgres(dest, src_table)
+                        dest_table = Table(src_table.name, dest_md, autoload_with=dest)
+                    except Exception as e:
+                        print(f'ERROR creating destination table {src_table.name}: {e}')
+                        continue
+                copy_table(source, dest, src_table, dest_table)
             except Exception as e:
-                print(f'ERROR copying {table.name}: {e}')
+                print(f'ERROR copying {src_table.name}: {e}')
     finally:
         enable_triggers(dest, tables)
 
