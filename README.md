@@ -228,9 +228,9 @@ Abrha Gebrehiwet Tesfamichael
 
 <div align="center">
 
-<img src="backend/uploads/carousel/online-shopping-1929002_1280_783202ba.png" alt="Home / Hero" width="800" />
+<img src="public/screenshots/home.png" alt="Home" width="800" />
 
-<img src="backend/uploads/carousel/miniature-silver-shopping-cart-on-a-black-keyboard_76cd280c.jpg" alt="Promotions" width="800" />
+<img src="public/screenshots/admin-dashboard.png" alt="Admin Dashboard" width="800" />
 
 </div>
 
