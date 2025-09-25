@@ -213,13 +213,13 @@ export default {
   async created() {
     if (this.txRef) {
       try {
-        const r = await fetch(`/api/payments/verify?tx_ref=${encodeURIComponent(this.txRef)}`)
+        const r = await fetch(`https://multi-vendor-ecommerce-website.onrender.com/payments/verify?tx_ref=${encodeURIComponent(this.txRef)}`)
         const data = await r.json()
         this.paymentStatus = data && data.ok ? 'paid' : 'failed'
         this.paymentMeta = data || null
         // Load audit trail for richer visibility (best-effort)
         try {
-          const ra = await fetch(`/api/payments/status?tx_ref=${encodeURIComponent(this.txRef)}`)
+          const ra = await fetch(`https://multi-vendor-ecommerce-website.onrender.com/payments/status?tx_ref=${encodeURIComponent(this.txRef)}`)
           const at = await ra.json()
           if (Array.isArray(at)) this.auditTrail = at
         } catch(_) { /* ignore */ }
@@ -229,7 +229,7 @@ export default {
           this.pollTimer = setInterval(async () => {
             if (--remaining <= 0) { clearInterval(this.pollTimer); this.pollTimer = null; return }
             try {
-              const r2 = await fetch(`/api/payments/verify?tx_ref=${encodeURIComponent(this.txRef)}`)
+              const r2 = await fetch(`https://multi-vendor-ecommerce-website.onrender.com/payments/verify?tx_ref=${encodeURIComponent(this.txRef)}`)
               const d2 = await r2.json()
               this.paymentStatus = d2 && d2.ok ? 'paid' : 'failed'
               this.paymentMeta = d2 || null
@@ -259,7 +259,7 @@ export default {
           postal_code: this.form.postal_code,
           country: this.form.country
         }
-        const res = await fetch(`/api/orders/${this.order.id}/payment-method`, {
+        const res = await fetch(`https://multi-vendor-ecommerce-website.onrender.com/orders/${this.order.id}/payment-method`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ payment_method: this.form.payment_method, address })

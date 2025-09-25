@@ -938,7 +938,7 @@ export default {
       finally{ this.ordersLoading = false }
     },
     async loadOrderSummary(){
-      try { const { data } = await http.get('/api/analytics/orders_summary'); if (data && !data.error) this.orderSummary = data }
+      try { const { data } = await http.get('/analytics/orders_summary'); if (data && !data.error) this.orderSummary = data }
       catch { /* ignore transient errors */ }
     },
     async updateRefundStatus(refundId, status, adminNotes = '') {
