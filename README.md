@@ -34,6 +34,7 @@ Operational marketplace with multi‑vendor catalogs, Chapa payments, admin dash
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 - [Author](#author)
+ - [Hosting](#hosting)
 
 ## 🧭 Overview
 
@@ -192,6 +193,28 @@ public/                Static assets
 - No redirect after checkout: verify backend is running and `POST /payments/checkout` returns `checkout_url`.
 - Want to stay on Chapa receipt screen: set `CHAPA_DISABLE_RETURN=true` and restart backend.
 - Order not updating after payment: ensure `CHAPA_CALLBACK_URL` is reachable and configured in Chapa; check backend logs for callback errors.
+
+## 🌐 Hosting
+
+Frontend (Netlify):
+- Production: https://afrashop.netlify.app
+- Env vars (Netlify → Site settings → Build & deploy → Environment):
+  - `VUE_APP_API_BASE_URL=https://multi-vendor-ecommerce-website.onrender.com`
+
+Backend (Render):
+- Production: https://multi-vendor-ecommerce-website.onrender.com
+- Required env vars (Render → Environment):
+  - `DATABASE_URL=postgresql://postgres:<PASSWORD>@aws-1-eu-central-1.pooler.supabase.com:6543/postgres`
+    - Note: Transaction Pooler URL recommended (port 6543). The app normalizes the URL to include driver and `sslmode=require`.
+  - `CORS_ORIGINS=https://afrashop.netlify.app`
+  - `CHAPA_CALLBACK_URL=https://multi-vendor-ecommerce-website.onrender.com/payments/chapa/callback`
+  - `CHAPA_RETURN_URL=https://afrashop.netlify.app/#/order-confirmation`
+  - Optional pool tuning:
+    - `SQL_POOL_SIZE=5`
+    - `SQL_MAX_OVERFLOW=10`
+    - `SQL_POOL_TIMEOUT=30`
+
+After updates, restart the Render service.
 
 ## 📄 License
 
