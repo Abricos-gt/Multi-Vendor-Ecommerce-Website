@@ -1,4 +1,4 @@
-const API_BASE = (typeof process !== 'undefined' && process.env && process.env.VUE_APP_API) || 'https://multi-vendor-ecommerce-website.onrender.com'
+const API_BASE = (typeof process !== 'undefined' && process.env && (process.env.VUE_APP_API_BASE_URL || process.env.VUE_APP_API)) || 'https://multi-vendor-ecommerce-website.onrender.com'
 
 async function request(path, options = {}) {
   const res = await fetch(API_BASE + path, {
