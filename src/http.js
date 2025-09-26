@@ -3,7 +3,7 @@ import axios from 'axios'
 // Resolve base URL: prefer env override, otherwise '/api' in dev, '' in prod
 const envBase = (typeof window !== 'undefined' && window.__API_BASE_URL__) || (typeof process !== 'undefined' && process.env && (process.env.VUE_APP_API_BASE_URL || process.env.VUE_APP_API)) || ''
 const isDev = typeof window !== 'undefined' && /localhost|127\.0\.0\.1/.test(window.location.host)
-const baseURL = envBase !== '' ? envBase : (isDev ? '/api' : 'https://multi-vendor-ecommerce-website.onrender.com')
+const baseURL = envBase !== '' ? envBase : (isDev ? 'http://localhost:5000' : 'https://multi-vendor-ecommerce-website.onrender.com')
 
 const http = axios.create({
   baseURL,
