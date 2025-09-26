@@ -11,15 +11,34 @@ def _normalize_database_url(url: str) -> str:
         # Normalize scheme for SQLAlchemy
         if url.startswith('postgres://'):
             url = 'postgresql://' + url[len('postgres://'):]
-        # Prefer explicit driver if missing
-        if url.startswith('postgresql://') and '+psycopg2' not in url.split('://', 1)[0]:
+        # Prefer explicit driver for Postgres when missing
+        scheme = url.split('://', 1)[0]
+        lower_scheme = scheme.lower()
+        # If not a Postgres URL, ensure we do NOT carry an sslmode query param
+        if not lower_scheme.startswith('postgresql') and 'sslmode=' in url.lower():
+            base, _, query = url.partition('?')
+            if query:
+                # remove sslmode from query string
+                parts = [p for p in query.split('&') if not p.lower().startswith('sslmode=')]
+                url = base if not parts else base + '?' + '&'.join(parts)
+        if url.startswith('postgresql://') and '+psycopg2' not in lower_scheme and '+psycopg' not in lower_scheme and '+pg8000' not in lower_scheme:
             url = 'postgresql+psycopg2://' + url[len('postgresql://'):]
-        # Ensure sslmode=require when missing
-        if url.startswith('postgresql'):  # covers postgresql+psycopg2
-            lower = url.lower()
-            if 'sslmode=' not in lower:
-                sep = '&' if '?' in url else '?'
-                url = f"{url}{sep}sslmode=require"
+        # Ensure TLS parameter, tailored per driver
+        if lower_scheme.startswith('postgresql'):
+            lower_url = url.lower()
+            if '+pg8000' in lower_scheme:
+                # pg8000 uses 'ssl' boolean param instead of sslmode
+                if 'sslmode=' in lower_url and 'ssl=' not in lower_url:
+                    # replace sslmode with ssl=true
+                    url = url.replace('sslmode=require', 'ssl=true').replace('sslmode=prefer', 'ssl=true')
+                if 'ssl=' not in url.lower():
+                    sep = '&' if '?' in url else '?'
+                    url = f"{url}{sep}ssl=true"
+            else:
+                # psycopg2/psycopg accept sslmode in DSN
+                if 'sslmode=' not in lower_url:
+                    sep = '&' if '?' in url else '?'
+                    url = f"{url}{sep}sslmode=require"
         return url
     except Exception:
         return url

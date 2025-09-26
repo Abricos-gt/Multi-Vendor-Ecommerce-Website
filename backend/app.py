@@ -21,21 +21,63 @@ from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 import psycopg2
 from config import DATABASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD, CORS_ORIGINS, DEBUG, HOST, PORT
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 from pathlib import Path
+
+def _sanitize_db_url(url: str) -> str:
+    try:
+        if not url:
+            return url
+        parsed = urlparse(url)
+        scheme = parsed.scheme.lower()
+        # Remove sslmode for non-Postgres
+        if not scheme.startswith('postgresql') and 'sslmode=' in (parsed.query or '').lower():
+            q = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k.lower() != 'sslmode']
+            return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, urlencode(q), parsed.fragment))
+        # For pg8000, translate sslmode to ssl=true
+        if scheme.startswith('postgresql') and '+pg8000' in scheme and 'sslmode=' in (parsed.query or '').lower():
+            q = [(('ssl' if k.lower() == 'sslmode' else k), ('true' if k.lower() == 'sslmode' else v)) for k, v in parse_qsl(parsed.query, keep_blank_values=True)]
+            return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, urlencode(q), parsed.fragment))
+        return url
+    except Exception:
+        return url
 
 # Initialize Flask app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
-app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+
+# Final safety normalization at runtime
+_DATABASE_URL_EFFECTIVE = _sanitize_db_url(DATABASE_URL)
+try:
+    # Redact password when logging
+    _safe_for_log = _DATABASE_URL_EFFECTIVE
+    if '://' in _safe_for_log and '@' in _safe_for_log:
+        prefix, rest = _safe_for_log.split('://', 1)
+        userinfo, hostpart = rest.split('@', 1) if '@' in rest else ('', rest)
+        if ':' in userinfo:
+            user, _pwd = userinfo.split(':', 1)
+            userinfo = f"{user}:***"
+        _safe_for_log = f"{prefix}://{userinfo}@{hostpart}"
+    print(f"[INFO] Using DATABASE_URL: {_safe_for_log}")
+except Exception:
+    pass
+
+app.config['SQLALCHEMY_DATABASE_URI'] = _DATABASE_URL_EFFECTIVE
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+_engine_options = {
     'pool_pre_ping': True,
     'pool_recycle': 280,
     'pool_size': int(os.getenv('SQL_POOL_SIZE', '5')),
     'max_overflow': int(os.getenv('SQL_MAX_OVERFLOW', '10')),
-    'pool_timeout': int(os.getenv('SQL_POOL_TIMEOUT', '30')),
-    'connect_args': { 'sslmode': 'require' }
+    'pool_timeout': int(os.getenv('SQL_POOL_TIMEOUT', '30'))
 }
+
+# Only pass sslmode for Postgres psycopg/psycopg2 drivers; pg8000 uses a different param
+_db_url_lower = _DATABASE_URL_EFFECTIVE.lower()
+if _db_url_lower.startswith('postgresql') and '+pg8000' not in _db_url_lower:
+    _engine_options['connect_args'] = { 'sslmode': os.getenv('PGSSLMODE', 'require') }
+
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = _engine_options
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-string')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=1)
 
