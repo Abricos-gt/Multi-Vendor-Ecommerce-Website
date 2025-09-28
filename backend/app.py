@@ -344,6 +344,20 @@ class VendorApplication(db.Model):
     # Relationship
     user = db.relationship('User', backref='vendor_application')
 
+class Review(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    rating = db.Column(db.Integer, nullable=False)  # 1-5 stars
+    comment = db.Column(db.Text, nullable=True)
+    photos = db.Column(db.Text, nullable=True)  # JSON string of photo URLs
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    product = db.relationship('Product', backref='reviews')
+    user = db.relationship('User', backref='reviews')
+
 class Refund(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
@@ -1197,6 +1211,12 @@ def get_product(product_id):
     except:
         sizes = []
     
+    # Calculate average rating from reviews
+    reviews = Review.query.filter_by(product_id=product_id).all()
+    avg_rating = 0
+    if reviews:
+        avg_rating = sum(review.rating for review in reviews) / len(reviews)
+    
     return jsonify({
         'id': product.id,
         'name': product.name,
@@ -1213,7 +1233,7 @@ def get_product(product_id):
         'sizes': sizes,
         'brand': getattr(product, 'brand', None),
         'made': getattr(product, 'made', None),
-        'rating': getattr(product, 'rating', 0) or 0,
+        'rating': round(avg_rating, 1),
         'is_featured': getattr(product, 'is_featured', False) or False,
         'created_at': product.created_at.isoformat() if product.created_at else None,
         'updated_at': product.updated_at.isoformat() if product.updated_at else None
@@ -1387,6 +1407,77 @@ def update_product(product_id):
         'sizes': json.loads(product.sizes) if product.sizes else [],
         'updated_at': product.updated_at.isoformat() if product.updated_at else None
     })
+
+# Review Endpoints
+@app.get('/products/<int:product_id>/reviews')
+def get_product_reviews(product_id):
+    """Get all reviews for a product"""
+    reviews = Review.query.filter_by(product_id=product_id).order_by(Review.created_at.desc()).all()
+    
+    return jsonify([{
+        'id': review.id,
+        'product_id': review.product_id,
+        'user_id': review.user_id,
+        'rating': review.rating,
+        'comment': review.comment if review.comment and review.comment.strip() else None,
+        'photos': json.loads(review.photos) if review.photos else [],
+        'created_at': review.created_at.isoformat() if review.created_at else None,
+        'reviewer_name': f"{review.user.first_name} {review.user.last_name}" if review.user else "Anonymous"
+    } for review in reviews])
+
+@app.post('/products/<int:product_id>/reviews')
+def create_review(product_id):
+    """Create a new review for a product"""
+    data = request.get_json() or {}
+    
+    user_id = data.get('user_id')
+    rating = data.get('rating')
+    comment = data.get('comment', '').strip()
+    photos = data.get('photos', [])
+    
+    # Validation
+    if not user_id:
+        return jsonify({'error': 'User ID is required'}), 400
+    if not rating or not isinstance(rating, int) or rating < 1 or rating > 5:
+        return jsonify({'error': 'Rating must be between 1 and 5'}), 400
+    
+    # Check if product exists
+    product = Product.query.get(product_id)
+    if not product:
+        return jsonify({'error': 'Product not found'}), 404
+    
+    # Check if user exists
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    # Check if user already reviewed this product
+    existing_review = Review.query.filter_by(product_id=product_id, user_id=user_id).first()
+    if existing_review:
+        return jsonify({'error': 'You have already reviewed this product'}), 400
+    
+    # Create review
+    review = Review(
+        product_id=product_id,
+        user_id=user_id,
+        rating=rating,
+        comment=comment,
+        photos=json.dumps(photos) if photos else None
+    )
+    
+    db.session.add(review)
+    db.session.commit()
+    
+    return jsonify({
+        'id': review.id,
+        'product_id': review.product_id,
+        'user_id': review.user_id,
+        'rating': review.rating,
+        'comment': review.comment,
+        'photos': photos,
+        'created_at': review.created_at.isoformat() if review.created_at else None,
+        'reviewer_name': f"{user.first_name} {user.last_name}"
+    }), 201
 
 @app.get('/users/<int:user_id>')
 def get_user(user_id):

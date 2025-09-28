@@ -57,7 +57,10 @@ else:
         _pwd = quote_plus(_pg_password)
         DATABASE_URL = f"postgresql+psycopg2://{_pg_user}:{_pwd}@{_pg_host}:{_pg_port}/{_pg_db}?sslmode={_pg_sslmode}"
     else:
-        DATABASE_URL = 'sqlite:///app.db'
+        # Use SQLite for local development with absolute path
+        import os
+        db_path = os.path.join(os.path.dirname(__file__), 'instance', 'app.db')
+        DATABASE_URL = f'sqlite:///{db_path}'
 
  
 # Admin Configuration (read from environment for security)

@@ -1,5 +1,5 @@
 <template>
-  <section class="pd">
+  <section class="pd" :key="viewKey">
     <!-- Back Button -->
     <div class="page-header">
       <button @click="goBack" class="back-button">
@@ -276,11 +276,11 @@
       </div>
             </div>
             <div class="review-actions">
-              <button class="btn-secondary">
+              <button class="btn-secondary" @click="notifyRatingsDisabled">
                 <i class="fas fa-star"></i>
                 Write a Review
               </button>
-              <button class="btn-secondary">
+              <button class="btn-secondary" @click="notifyRatingsDisabled">
                 <i class="fas fa-camera"></i>
                 Upload Photos
               </button>
@@ -293,7 +293,7 @@
           <i class="fas fa-star"></i>
           <h3>No Reviews Yet</h3>
           <p>Be the first to review this product and help other customers make informed decisions.</p>
-          <button class="btn-primary">
+          <button class="btn-primary" @click="notifyRatingsDisabled">
             <i class="fas fa-star"></i>
             Write First Review
           </button>
@@ -319,7 +319,7 @@
               </div>
             </div>
             <div class="review-content">
-              <div class="review-comment">{{ review.comment || 'No comment provided.' }}</div>
+              <div v-if="review.comment" class="review-comment">{{ review.comment }}</div>
               <div v-if="review.photos && review.photos.length > 0" class="review-photos">
                 <img v-for="photo in review.photos" :key="photo" :src="photo" :alt="review.reviewer_name" />
               </div>
@@ -387,6 +387,9 @@ export default {
       quantity: 1,
       reviews: [],
       relatedProducts: [],
+      viewKey: 0,
+      showReviewModal: false,
+      submittingReview: false,
       notification: {
         show: false,
         message: '',
@@ -413,29 +416,17 @@ export default {
     }
   },
   methods: {
-    goBack() {
-      window.history.back()
-    },
+    goBack() { window.history.back() },
     async loadProduct() {
-      // Extract product ID from URL hash
       const hash = window.location.hash
       const match = hash.match(/#\/products\/(\d+)/)
-      
-      if (!match) {
-        console.error('No product ID found in URL')
-        return
-      }
-      
+      if (!match) { console.error('No product ID found in URL'); return }
       const productId = match[1]
-
       try {
         const { data } = await http.get(`/products/${productId}`)
         this.product = data
         this.selectedImage = this.product.image_url
-        
-        // Add the product to the store so cart can access it
         store.addProductToStore(data)
-        
         this.loadReviews()
         this.loadRelatedProducts()
       } catch (error) {
@@ -444,12 +435,17 @@ export default {
       }
     },
     async loadReviews() {
-      // Mock reviews data
-      this.reviews = []
+      if (!this.product) return
+      try {
+        const { data } = await http.get(`/products/${this.product.id}/reviews`)
+        this.reviews = data
+      } catch (error) {
+        console.error('Failed to load reviews:', error)
+        this.reviews = []
+      }
     },
     async loadRelatedProducts() {
       if (!this.product) return
-      
       try {
         const { data } = await http.get(`/products?category=${encodeURIComponent(this.product.category)}&limit=4`)
         this.relatedProducts = (data || []).filter(p => p.id !== this.product.id).slice(0, 4)
@@ -458,102 +454,64 @@ export default {
         this.relatedProducts = []
       }
     },
+    notifyRatingsDisabled() { this.showNotification('Ratings are temporarily disabled. Please try later.', 'error') },
+    showReviewForm() {
+      const user = store.getUser()
+      if (!user) { this.showNotification('Please login to write a review', 'error'); return }
+      this.notifyRatingsDisabled()
+    },
+    closeReviewForm() { this.showReviewModal = false },
+    async handleReviewSubmit(reviewData) {
+      const user = store.getUser()
+      if (!user) { this.showNotification('Please login to write a review', 'error'); return }
+      this.submittingReview = true
+      try {
+        const payload = { user_id: user.id, rating: reviewData.rating, comment: reviewData.comment, photos: [] }
+        await http.post(`/products/${this.product.id}/reviews`, payload)
+        this.showNotification('Review submitted successfully!', 'success')
+        this.closeReviewForm()
+        await this.loadReviews()
+        await this.loadProduct()
+        this.viewKey += 1
+      } catch (error) {
+        console.error('Failed to submit review:', error)
+        this.showNotification('Failed to submit review. Please try again.', 'error')
+      } finally { this.submittingReview = false }
+    },
+    showPhotoUpload() { this.showNotification('Photo upload feature coming soon!', 'success') },
     addToCart() {
       if (!this.canAddToCart) return
-
       const user = store.getUser()
-      if (!user) {
-        this.showNotification('Please login to add items to cart', 'error')
-        return
-      }
-
+      if (!user) { this.showNotification('Please login to add items to cart', 'error'); return }
       store.addToCart(this.product.id, this.quantity)
       this.showNotification(`${this.product.name} added to cart!`)
     },
     buyNow() {
       if (!this.canAddToCart) return
-
       const user = store.getUser()
-      if (!user) {
-        this.showNotification('Please login to continue with purchase', 'error')
-        // Redirect to signin page after a short delay
-        setTimeout(() => {
-          window.location.hash = '#/signin'
-        }, 1500)
-        return
-      }
-
-      // Add to cart and redirect to cart for checkout
+      if (!user) { this.showNotification('Please login to continue with purchase', 'error'); setTimeout(() => { window.location.hash = '#/signin' }, 1500); return }
       store.addToCart(this.product.id, this.quantity)
       this.showNotification(`${this.product.name} added to cart!`)
       window.location.hash = '#/cart'
     },
     toggleWishlist() {
       if (!this.product) return
-
       const wishlist = JSON.parse(localStorage.getItem('mv_wishlist') || '[]')
       const index = wishlist.indexOf(this.product.id)
-
-      if (index > -1) {
-        wishlist.splice(index, 1)
-        this.showNotification(`${this.product.name} removed from wishlist`)
-      } else {
-        wishlist.push(this.product.id)
-        this.showNotification(`${this.product.name} added to wishlist`)
-      }
-
+      if (index > -1) { wishlist.splice(index, 1); this.showNotification(`${this.product.name} removed from wishlist`) }
+      else { wishlist.push(this.product.id); this.showNotification(`${this.product.name} added to wishlist`) }
       localStorage.setItem('mv_wishlist', JSON.stringify(wishlist))
     },
-    increaseQuantity() {
-      if (this.quantity < this.product.stock_quantity) {
-        this.quantity++
-      }
-    },
-    decreaseQuantity() {
-      if (this.quantity > 1) {
-        this.quantity--
-      }
-    },
-    viewProduct(productId) {
-      window.location.hash = `#/products/${productId}`
-    },
-    formatPrice(price) {
-      return parseFloat(price).toFixed(2)
-    },
-    formatDate(dateString) {
-      if (!dateString) return 'Unknown date'
-      return new Date(dateString).toLocaleDateString()
-    },
-    showNotification(message, type = 'success') {
-      this.notification = {
-        show: true,
-        message,
-        type
-      }
-      setTimeout(() => {
-        this.hideNotification()
-      }, 3000)
-    },
-    hideNotification() {
-      this.notification.show = false
-    },
-    handleHashChange() {
-      // Reload product when URL hash changes
-      this.loadProduct()
-    }
+    increaseQuantity() { if (this.quantity < this.product.stock_quantity) { this.quantity++ } },
+    decreaseQuantity() { if (this.quantity > 1) { this.quantity-- } },
+    viewProduct(productId) { window.location.hash = `#/products/${productId}` },
+    formatPrice(price) { return parseFloat(price).toFixed(2) },
+    formatDate(dateString) { if (!dateString) return 'Unknown date'; try { return new Date(dateString).toLocaleDateString() } catch (_) { return dateString } },
+    showNotification(message, type = 'success') { this.notification = { show: true, message, type }; setTimeout(() => this.hideNotification(), 2500) },
+    hideNotification() { this.notification.show = false }
   },
-  created() {
-    this.loadProduct()
-  },
-  mounted() {
-    // Listen for hash changes to reload product when URL changes
-    window.addEventListener('hashchange', this.handleHashChange)
-  },
-  beforeUnmount() {
-    // Clean up event listener
-    window.removeEventListener('hashchange', this.handleHashChange)
-    }
-  }
+  mounted() { this.loadProduct() }
+}
 </script>
 
 <style scoped>
@@ -1506,4 +1464,5 @@ export default {
     min-width: auto;
   }
 }
+
 </style>

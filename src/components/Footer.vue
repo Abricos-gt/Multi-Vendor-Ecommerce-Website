@@ -11,7 +11,7 @@
       <div class="footer__section">
         <h3 class="footer__heading">Contact Us</h3>
         <ul class="footer__list">
-          <li><i class="fas fa-phone-alt"></i> +251 911 123456</li>
+          <li><i class="fas fa-phone-alt"></i> +251 986787287</li>
           <li><i class="fas fa-envelope"></i> support@afrashop.com</li>
           <li><i class="fas fa-map-marker-alt"></i> Mekelle, Ethiopia</li>
         </ul>
