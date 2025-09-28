@@ -20,7 +20,7 @@
 
       <div style="display:flex; gap:10px; margin-top:8px;">
         <a href="#/products" 
-           style="padding:10px 18px; background:#4f46e5; color:#fff; text-decoration:none;
+           style="padding:10px 18px; background:#37A000; color:#fff; text-decoration:none;
                   border-radius:10px; font-weight:500; font-size:14px;
                   transition:background 0.2s ease;">
           Back to Products
@@ -36,6 +36,6 @@ export default { name: 'PendingApproval' }
 
 <style scoped>
 a:hover {
-  background: #4338ca; /* darker hover */
+  background: #2d7a00; /* darker green hover */
 }
 </style>

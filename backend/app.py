@@ -3128,26 +3128,90 @@ def admin_orders_list():
     except Exception as e:
         return jsonify({'error': f'Failed to load orders: {e}'}), 500
 
+@app.get('/users/<int:user_id>/orders')
+def get_user_orders(user_id):
+    """Get all orders for a specific user"""
+    try:
+        orders = Order.query.filter_by(user_id=user_id).order_by(Order.created_at.desc()).all()
+        
+        orders_data = []
+        for order in orders:
+            # Get order items with product details
+            items = []
+            for item in OrderItem.query.filter_by(order_id=order.id).all():
+                product = Product.query.get(item.product_id)
+                items.append({
+                    'id': item.id,
+                    'product_id': item.product_id,
+                    'product_name': product.name if product else 'Unknown Product',
+                    'product_image': product.image_url if product else '',
+                    'quantity': item.quantity,
+                    'price': item.price,
+                    'line_total': float(item.price or 0) * float(item.quantity or 0),
+                    'color': item.color,
+                    'size': item.size
+                })
+            
+            orders_data.append({
+                'id': order.id,
+                'user_id': order.user_id,
+                'total_amount': order.total_amount,
+                'status': order.status,
+                'payment_status': order.payment_status,
+                'payment_method': order.payment_method,
+                'payment_reference': order.payment_reference,
+                'shipping_address': order.shipping_address,
+                'created_at': order.created_at.isoformat() if order.created_at else None,
+                'updated_at': order.updated_at.isoformat() if order.updated_at else None,
+                'items': items
+            })
+        
+        print(f"[DEBUG] Found {len(orders_data)} orders for user {user_id}")
+        return jsonify(orders_data)
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to load user orders: {e}")
+        return jsonify({'error': f'Failed to load orders: {e}'}), 500
+
 @app.get('/vendors/<int:vendor_id>/orders')
 def vendor_orders(vendor_id: int):
     """List orders scoped to a specific vendor by joining order_items and products."""
     try:
         q = db.session.query(
-            OrderItem, Order, Product
-        ).join(Order, OrderItem.order_id == Order.id).join(Product, OrderItem.product_id == Product.id).filter(Product.vendor_id == vendor_id).order_by(Order.created_at.desc()).limit(200)
+            OrderItem, Order, Product, User
+        ).join(Order, OrderItem.order_id == Order.id).join(Product, OrderItem.product_id == Product.id).join(User, Order.user_id == User.id).filter(Product.vendor_id == vendor_id).order_by(Order.created_at.desc()).limit(200)
         rows = q.all()
-        out = []
-        for oi, o, p in rows:
-            out.append({
-                'order_id': o.id,
+        
+        # Group by order to avoid duplicates
+        orders_dict = {}
+        for oi, o, p, u in rows:
+            if o.id not in orders_dict:
+                orders_dict[o.id] = {
+                    'order_id': o.id,
+                    'user_id': o.user_id,
+                    'customer_name': f"{u.first_name} {u.last_name}".strip() if u else 'Unknown Customer',
+                    'customer_email': u.email if u else '',
+                    'total_amount': o.total_amount,
+                    'status': o.status,
+                    'payment_status': o.payment_status,
+                    'payment_method': o.payment_method,
+                    'payment_reference': o.payment_reference,
+                    'shipping_address': o.shipping_address,
+                    'created_at': o.created_at.isoformat() if o.created_at else None,
+                    'items': []
+                }
+            
+            orders_dict[o.id]['items'].append({
                 'product_id': oi.product_id,
                 'product_name': p.name,
                 'quantity': oi.quantity,
                 'price': oi.price,
-                'status': o.status,
-                'payment_status': o.payment_status,
-                'created_at': o.created_at.isoformat() if o.created_at else None
+                'line_total': float(oi.price or 0) * float(oi.quantity or 0),
+                'color': oi.color,
+                'size': oi.size
             })
+        
+        out = list(orders_dict.values())
         return jsonify(out)
     except Exception as e:
         return jsonify({'error': f'Failed to load vendor orders: {e}'}), 500

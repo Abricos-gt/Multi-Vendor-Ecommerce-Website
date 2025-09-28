@@ -231,46 +231,151 @@
            </div>
            
           <div v-else class="orders__list">
-           <div v-for="order in orders" :key="order.sub_order_id" class="order__card">
+           <div v-for="order in orders" :key="order.order_id" class="order__card">
               <div class="order__header">
                <div class="order__title">
-                 <h4>Sub-Order #{{ order.sub_order_id }}</h4>
-                 <span class="muted">Master #{{ order.order_id }}</span>
+                 <h4>
+                   <i class="fas fa-shopping-bag order-icon"></i>
+                   Order #{{ order.order_id }}
+                 </h4>
+                 <div class="order__customer">
+                   <i class="fas fa-user customer-icon"></i>
+                   <span>{{ order.customer_name || 'Unknown Customer' }}</span>
+                 </div>
                </div>
                <div class="order__meta">
-                 <span class="order__date">{{ formatDate(order.created_at) }}</span>
-                 <span v-if="order.payment_status" class="order__badge" :class="`is-${order.payment_status}`">{{ (order.payment_status||'').toUpperCase() }}</span>
-                 <span v-if="order.payment_method" class="order__badge muted">{{ order.payment_method }}</span>
-                 <span v-if="order.payment_reference" class="order__ref"><span>Ref:</span><code>{{ order.payment_reference }}</code></span>
+                 <div class="order__date">
+                   <i class="fas fa-calendar-alt"></i>
+                   {{ formatDate(order.created_at) }}
+                 </div>
+                 <div class="order__badges">
+                   <span v-if="order.payment_status" class="order__badge payment" :class="`payment-${order.payment_status}`">
+                     <i class="fas fa-credit-card"></i>
+                     {{ (order.payment_status||'').toUpperCase() }}
+                   </span>
+                   <span v-if="order.payment_method" class="order__badge method">
+                     <i class="fas fa-wallet"></i>
+                     {{ order.payment_method }}
+                   </span>
+                 </div>
+                 <div v-if="order.payment_reference" class="order__ref">
+                   <i class="fas fa-hashtag"></i>
+                   <span>Ref:</span>
+                   <code>{{ order.payment_reference }}</code>
+                 </div>
                </div>
               </div>
               
               <div class="order__items">
-                <div v-for="item in order.items" :key="`${order.sub_order_id}-${item.product_id}`" class="order__item">
-                   <div class="order__item-info">
-                     <span class="order__item-name">{{ item.product_name }}</span>
-                     <span class="order__item-quantity">Qty: {{ item.quantity }}</span>
+                <div class="order__items-header">
+                  <h5><i class="fas fa-box"></i> Order Items ({{ order.items?.length || 0 }})</h5>
+                </div>
+                <div class="order__items-list">
+                  <div v-for="item in order.items" :key="`${order.order_id}-${item.product_id}`" class="order__item">
+                     <div class="order__item-info">
+                       <div class="order__item-main">
+                         <span class="order__item-name">{{ item.product_name }}</span>
+                         <div class="order__item-variants">
+                           <span class="order__item-quantity">
+                             <i class="fas fa-layer-group"></i>
+                             Qty: {{ item.quantity }}
+                           </span>
+                           <span v-if="item.color" class="order__item-variant color">
+                             <i class="fas fa-palette"></i>
+                             {{ item.color }}
+                           </span>
+                           <span v-if="item.size" class="order__item-variant size">
+                             <i class="fas fa-ruler"></i>
+                             {{ item.size }}
+                           </span>
+                         </div>
+                       </div>
+                     </div>
+                     <div class="order__item-pricing">
+                       <div class="order__item-unit-price">
+                         <span class="price-label">Unit Price:</span>
+                         <span class="price-value">ETB {{ (Number(item.price)||0).toFixed(2) }}</span>
+                       </div>
+                       <div class="order__item-total">
+                         <span class="total-label">Total:</span>
+                         <span class="total-value">ETB {{ (Number(item.line_total)||0).toFixed(2) }}</span>
+                       </div>
+                     </div>
                    </div>
-                   <div class="order__item-price">
-                   <span class="order__item-unit-price">ETB {{ (Number(item.price)||0).toFixed(2) }}</span>
-                   <span class="order__item-total">ETB {{ (Number(item.line_total)||0).toFixed(2) }}</span>
+                 </div>
+               </div>
+               
+               <!-- Shipping Address Section -->
+               <div v-if="getShippingAddress(order)" class="order__shipping">
+                 <div class="shipping__header">
+                   <h5><i class="fas fa-map-marker-alt"></i> Delivery Address</h5>
+                 </div>
+                 <div class="shipping__info">
+                   <div class="shipping__customer">
+                     <div class="customer__name">
+                       <i class="fas fa-user"></i>
+                       <strong>{{ getShippingAddress(order).name || 'N/A' }}</strong>
+                     </div>
+                     <div v-if="getShippingAddress(order).phone" class="customer__phone">
+                       <i class="fas fa-phone"></i>
+                       {{ getShippingAddress(order).phone }}
+                     </div>
+                   </div>
+                   <div class="shipping__address">
+                     <div class="shipping__street">
+                       <i class="fas fa-home"></i>
+                       <strong>Street:</strong> {{ getShippingAddress(order).street || 'N/A' }}
+                     </div>
+                     <div class="shipping__location">
+                       <i class="fas fa-map"></i>
+                       {{ [getShippingAddress(order).city, getShippingAddress(order).state, getShippingAddress(order).postal_code].filter(Boolean).join(', ') }}
+                     </div>
+                     <div class="shipping__country">
+                       <i class="fas fa-flag"></i>
+                       {{ getShippingAddress(order).country || 'Ethiopia' }}
+                     </div>
                    </div>
                  </div>
                </div>
                
               <div class="order__footer">
-                <span class="order__total">Subtotal: ETB {{ (order.subtotal||0).toFixed(2) }}</span>
-                <span class="order__total">Commission: ETB {{ (order.commission_amount||0).toFixed(2) }}</span>
-                <span class="order__total">Payout: ETB {{ (order.vendor_payout||0).toFixed(2) }}</span>
-                <span class="order__status">Status:</span>
-                <select class="order__statusSelect" :value="order.status" @change="onChangeStatus(order, $event.target.value)">
-                  <option value="pending">Pending</option>
-                  <option value="processing">Processing</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-                <a v-if="order.receipt_url" :href="order.receipt_url" target="_blank" rel="noopener" class="btn" style="margin-left:auto">Invoice</a>
+                <div class="order__summary">
+                  <div class="summary__item">
+                    <span class="summary__label">Subtotal:</span>
+                    <span class="summary__value">ETB {{ (order.subtotal||0).toFixed(2) }}</span>
+                  </div>
+                  <div class="summary__item">
+                    <span class="summary__label">Commission:</span>
+                    <span class="summary__value commission">ETB {{ (order.commission_amount||0).toFixed(2) }}</span>
+                  </div>
+                  <div class="summary__item total">
+                    <span class="summary__label">Your Payout:</span>
+                    <span class="summary__value payout">ETB {{ (order.vendor_payout||0).toFixed(2) }}</span>
+                  </div>
+                </div>
+                
+                <div class="order__actions">
+                  <div class="status__control">
+                    <label class="status__label">
+                      <i class="fas fa-cog"></i>
+                      Order Status:
+                    </label>
+                    <select class="order__statusSelect" :value="order.status" @change="onChangeStatus(order, $event.target.value)">
+                      <option value="pending">Pending</option>
+                      <option value="processing">Processing</option>
+                      <option value="shipped">Shipped</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                  
+                  <div class="action__buttons">
+                    <a v-if="order.receipt_url" :href="order.receipt_url" target="_blank" rel="noopener" class="btn btn-invoice">
+                      <i class="fas fa-file-invoice"></i>
+                      Invoice
+                    </a>
+                  </div>
+                </div>
                </div>
 
                <div class="order__shipping" v-if="order.shipping">
@@ -771,6 +876,15 @@ export default {
     formatDate(dateString) { 
       return dateString ? new Date(dateString).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '' 
     },
+    getShippingAddress(order) {
+      try {
+        const raw = order?.shipping_address
+        if (!raw) return null
+        return typeof raw === 'string' ? JSON.parse(raw) : raw
+      } catch (_) {
+        return null
+      }
+    },
     showNotification(message, type = 'success') { 
       if (!this.notification) this.notification = { show: false, message: '', type: 'success' }
       this.notification.show = true
@@ -1105,23 +1219,557 @@ export default {
 .order__badge.is-pending{background:#fff7ed;color:#92400e;border-color:#f59e0b}
 .order__badge.is-failed{background:#fef2f2;color:#7f1d1d;border-color:#ef4444}
 .order__badge.muted{background:#f1f5f9;color:#334155}
-.orders__list{ display:grid; gap:12px }
-.order__card{ background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; box-shadow:0 1px 3px rgba(0,0,0,.05) }
-.order__header{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap }
-.order__title h4{ margin:0 }
-.order__title .muted{ color:#64748b; font-size:12px }
-.order__meta{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
-.order__ref{ display:flex; gap:4px; align-items:center }
-.order__ref code{ background:#f1f5f9; border:1px solid #e2e8f0; padding:1px 4px; border-radius:6px; font-size:12px }
-.order__items{ display:grid; gap:8px; margin-top:8px }
-.order__item{ display:flex; align-items:center; justify-content:space-between }
-.order__item-info{ display:flex; gap:8px; align-items:center }
-.order__item-name{ font-weight:700 }
-.order__item-price{ display:flex; gap:8px; align-items:center; color:#111827; font-weight:700 }
-.order__footer{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; border-top:1px dashed #e5e7eb; padding-top:10px }
-.order__total{ font-weight:700; color:#111827 }
-.order__status{ margin-left:auto; color:#64748b; font-size:12px }
-.order__statusSelect{ border:1px solid #e5e7eb; border-radius:6px; padding:4px 6px; background:#fff }
+.orders__list{ 
+  display: grid; 
+  gap: 20px;
+  padding: 20px 0;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+}
+.order__card{ 
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e2e8f0; 
+  border-radius: 16px; 
+  padding: 20px; 
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.order__card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border-color: #37A000;
+}
+
+.order__card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #37A000, #2d7a00);
+}
+
+.order__header{ 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: flex-start; 
+  gap: 16px; 
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.order__title h4{ 
+  margin: 0; 
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.order-icon {
+  color: #37A000;
+  font-size: 18px;
+}
+
+.order__customer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.customer-icon {
+  color: #37A000;
+  font-size: 12px;
+}
+
+.order__meta{ 
+  display: flex; 
+  flex-direction: column;
+  gap: 12px; 
+  align-items: flex-end;
+}
+
+.order__date {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  color: #475569;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.order__badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.order__badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.order__badge.payment.payment-paid {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.order__badge.payment.payment-pending {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.order__badge.payment.payment-failed {
+  background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.order__badge.method {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+
+.order__ref{ 
+  display: flex; 
+  gap: 6px; 
+  align-items: center;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.order__ref code{ 
+  background: #ffffff; 
+  border: 1px solid #d1d5db; 
+  padding: 3px 8px; 
+  border-radius: 4px; 
+  font-size: 11px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  color: #374151;
+  font-weight: 600;
+}
+
+.order__items{ 
+  margin: 20px 0;
+  background: linear-gradient(135deg, #fafbfc 0%, #f8fafc 100%);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #f1f5f9;
+}
+
+.order__items-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.order__items-header h5 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.order__items-list {
+  display: grid;
+  gap: 12px;
+}
+
+.order__item{ 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between;
+  padding: 12px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #f1f5f9;
+  transition: all 0.2s ease;
+}
+
+.order__item:hover {
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.order__item-info{ 
+  display: flex; 
+  gap: 12px; 
+  align-items: center;
+  flex: 1;
+}
+
+.order__item-name{ 
+  font-weight: 600;
+  color: #111827;
+  font-size: 14px;
+}
+
+.order__item-quantity {
+  background: #37A000;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.order__item-price{ 
+  display: flex; 
+  gap: 12px; 
+  align-items: center; 
+  color: #111827; 
+  font-weight: 600;
+}
+
+.order__item-unit-price {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.order__item-total {
+  color: #37A000;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Enhanced Order Item Styles */
+.order__item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order__item-variants {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.order__item-variant {
+  font-size: 11px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 4px 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.order__item-variant.color {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+}
+
+.order__item-variant.size {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+}
+
+.order__item-pricing {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: right;
+  min-width: 120px;
+}
+
+.price-label {
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.price-value {
+  font-size: 13px;
+  color: #374151;
+  font-weight: 600;
+}
+
+.total-label {
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.total-value {
+  font-size: 15px;
+  color: #37A000;
+  font-weight: 700;
+}
+
+/* Shipping Address Styles */
+.order__shipping {
+  margin-top: 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.shipping__header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.shipping__header h5 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shipping__info {
+  display: grid;
+  gap: 16px;
+}
+
+.shipping__customer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.customer__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.customer__phone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #6b7280;
+  background: #f1f5f9;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.shipping__address {
+  display: grid;
+  gap: 12px;
+}
+
+.shipping__street {
+  font-weight: 600;
+  color: #111827;
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  padding: 12px 16px;
+  border-radius: 8px;
+  border-left: 4px solid #37A000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shipping__location {
+  color: #6b7280;
+  font-size: 13px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shipping__country {
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+}
+
+.order__item-variant {
+  font-size: 12px;
+  color: #6b7280;
+  margin-left: 8px;
+}
+.order__footer{ 
+  margin-top: 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.order__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.summary__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.summary__item.total {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border-color: #37A000;
+}
+
+.summary__label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.summary__value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.summary__value.commission {
+  color: #dc2626;
+}
+
+.summary__value.payout {
+  color: #37A000;
+  font-size: 18px;
+}
+
+.order__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.status__control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.order__statusSelect{ 
+  border: 1px solid #e5e7eb; 
+  border-radius: 8px; 
+  padding: 8px 12px; 
+  background: #ffffff;
+  font-size: 13px;
+  color: #374151;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.order__statusSelect:hover {
+  border-color: #37A000;
+  box-shadow: 0 2px 4px rgba(55, 160, 0, 0.1);
+}
+
+.order__statusSelect:focus {
+  outline: none;
+  border-color: #37A000;
+  box-shadow: 0 0 0 3px rgba(55, 160, 0, 0.1);
+}
+
+.action__buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-invoice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #37A000;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  border: 1px solid #37A000;
+}
+
+.btn-invoice:hover {
+  background: #2d7a00;
+  border-color: #2d7a00;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
 
 /* Unauthorized Access Styles */
 .unauthorized-page {

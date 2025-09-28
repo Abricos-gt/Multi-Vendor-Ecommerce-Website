@@ -178,9 +178,9 @@
               <i class="fas fa-bolt"></i>
               Buy Now
             </button>
-            <button @click="toggleWishlist" class="btn-wishlist" :class="{ active: isInWishlist }">
+            <button @click="toggleWishlist" class="btn-wishlist" :class="{ active: isInWishlist }" :disabled="!isAuthenticated">
               <i class="fas fa-heart"></i>
-              {{ isInWishlist ? 'In Wishlist' : 'Add to Wishlist' }}
+              {{ isAuthenticated ? (isInWishlist ? 'In Wishlist' : 'Add to Wishlist') : 'Sign in to Add to Wishlist' }}
             </button>
           </div>
         </div>
@@ -410,9 +410,12 @@ export default {
       return this.product && this.product.stock_quantity > 0 && this.quantity <= this.product.stock_quantity
     },
     isInWishlist() {
-      if (!this.product) return false
+      if (!this.product || !this.isAuthenticated) return false
       const wishlist = JSON.parse(localStorage.getItem('mv_wishlist') || '[]')
       return wishlist.includes(this.product.id)
+    },
+    isAuthenticated() {
+      return !!store.getUser()
     }
   },
   methods: {
@@ -496,10 +499,26 @@ export default {
     },
     toggleWishlist() {
       if (!this.product) return
+      
+      // Check authentication
+      if (!this.isAuthenticated) {
+        this.showNotification('Please sign in to add items to your wishlist', 'warning')
+        // Redirect to sign in page
+        setTimeout(() => {
+          window.location.hash = '#/signin'
+        }, 1500)
+        return
+      }
+      
       const wishlist = JSON.parse(localStorage.getItem('mv_wishlist') || '[]')
       const index = wishlist.indexOf(this.product.id)
-      if (index > -1) { wishlist.splice(index, 1); this.showNotification(`${this.product.name} removed from wishlist`) }
-      else { wishlist.push(this.product.id); this.showNotification(`${this.product.name} added to wishlist`) }
+      if (index > -1) { 
+        wishlist.splice(index, 1)
+        this.showNotification(`${this.product.name} removed from wishlist`) 
+      } else { 
+        wishlist.push(this.product.id)
+        this.showNotification(`${this.product.name} added to wishlist`) 
+      }
       localStorage.setItem('mv_wishlist', JSON.stringify(wishlist))
     },
     increaseQuantity() { if (this.quantity < this.product.stock_quantity) { this.quantity++ } },

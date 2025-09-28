@@ -78,7 +78,7 @@
     <div v-else class="grid auto">
       <article v-for="p in paginatedItems" :key="p.id" class="card" @click="openDetail(p.id)">
         <div class="card-top">
-          <button class="wish-btn" :class="{ active: isWishlisted(p.id) }" @click.stop="toggleWishlist(p.id)" :aria-pressed="isWishlisted(p.id)">
+          <button class="wish-btn" :class="{ active: isWishlisted(p.id), disabled: !isAuthenticated }" @click.stop="toggleWishlist(p.id)" :aria-pressed="isWishlisted(p.id)" :disabled="!isAuthenticated">
             <svg viewBox="0 0 24 24" class="wish-icon" fill="currentColor">
               <path d="M12 21s-6.716-4.087-9.193-7.143C.767 11.51.954 8.7 2.757 6.9 4.56 5.1 7.37 4.912 9.143 6.686L12 9.536l2.857-2.85c1.773-1.774 4.583-1.586 6.386.214 1.803 1.8 1.99 4.61-.05 6.957C18.716 16.913 12 21 12 21z"/>
             </svg>
@@ -313,7 +313,20 @@ export default {
       } catch (_) { /* ignore */ }
     },
     isWishlisted(id){ return this.wishlist.has(id) },
+    isAuthenticated() {
+      return !!store.getUser()
+    },
     toggleWishlist(id){
+      // Check authentication
+      if (!this.isAuthenticated) {
+        this.showNotification('Please sign in to add items to your wishlist', 'warning')
+        // Redirect to sign in page
+        setTimeout(() => {
+          window.location.hash = '#/signin'
+        }, 1500)
+        return
+      }
+      
       if (this.wishlist.has(id)) this.wishlist.delete(id); else this.wishlist.add(id)
       localStorage.setItem('mv_wishlist', JSON.stringify(Array.from(this.wishlist)))
       this.showNotification(this.wishlist.has(id) ? 'Added to wishlist' : 'Removed from wishlist')
@@ -480,6 +493,8 @@ hideNotification() {
 .wish-btn{ background: rgba(0,0,0,0.04); border:1px solid var(--border-color,#e5e7eb); width:32px; height:32px; border-radius:999px; display:flex; align-items:center; justify-content:center; color:#9ca3af; cursor:pointer; transition:all .15s ease; }
 .wish-btn:hover{ background:#fee2e2; color:#ef4444; border-color:#fecaca; }
 .wish-btn.active{ background:#ef4444; color:#fff; border-color:#ef4444; }
+.wish-btn.disabled{ cursor:not-allowed; opacity:0.5; }
+.wish-btn.disabled:hover{ background:rgba(0,0,0,0.04); color:#9ca3af; border-color:var(--border-color,#e5e7eb); }
 .wish-icon{ width:16px; height:16px; }
 
 .card:hover {

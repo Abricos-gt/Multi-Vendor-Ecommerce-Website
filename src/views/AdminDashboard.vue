@@ -104,15 +104,28 @@
               </thead>
               <tbody>
                 <tr v-for="o in adminOrders" :key="o.id">
-                  <td>#{{ o.id }}</td>
+                  <td>
+                    <a :href="`#/orders/${o.id}`" class="order-link">#{{ o.id }}</a>
+                  </td>
                   <td>{{ o.user_id }}</td>
                   <td>{{ formatETB(o.total_amount) }}</td>
-                  <td>{{ (o.status||'').toUpperCase() }}</td>
-                  <td>{{ (o.payment_status||'').toUpperCase() }}</td>
+                  <td>
+                    <span class="status-badge" :class="`status-${(o.status||'').toLowerCase()}`">
+                      {{ (o.status||'').toUpperCase() }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="payment-badge" :class="`payment-${(o.payment_status||'').toLowerCase()}`">
+                      {{ (o.payment_status||'').toUpperCase() }}
+                    </span>
+                  </td>
                   <td>{{ o.payment_method || '-' }}</td>
                   <td>{{ formatDate(o.created_at) }}</td>
                   <td>
-                    <a v-if="o.receipt_url" :href="o.receipt_url" target="_blank" rel="noopener">Invoice</a>
+                    <div class="order-actions">
+                      <a v-if="o.receipt_url" :href="o.receipt_url" target="_blank" rel="noopener" class="btn-small">Invoice</a>
+                      <a :href="`#/orders/${o.id}`" class="btn-small primary">View Details</a>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -1308,6 +1321,86 @@ export default {
 .apps-details .doc img{width:100%;height:auto;display:block}
 .apps-details .apps-meta{flex:1;display:flex;flex-direction:column;gap:8px}
 .apps-details .apps-meta textarea{border:1px solid #e5e7eb;border-radius:8px;padding:8px;min-height:120px}
+
+/* Order Links and Actions */
+.order-link {
+  color: #37A000;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.order-link:hover {
+  color: #2d7a00;
+  text-decoration: underline;
+}
+
+.status-badge, .payment-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+}
+
+.status-badge.status-completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.payment-badge.payment-paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.payment-badge.payment-pending {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.order-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-small {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.btn-small.primary {
+  background: #37A000;
+  color: white;
+  border-color: #37A000;
+}
+
+.btn-small.primary:hover {
+  background: #2d7a00;
+  border-color: #2d7a00;
+}
+
+.btn-small:not(.primary) {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.btn-small:not(.primary):hover {
+  background: #e5e7eb;
+}
 .btn{padding:4px 8px;border-radius:6px;font-weight:500;font-size:13px;cursor:pointer}
 .btn.small{padding:4px 6px;font-size:12px}
 .btn.neutral{background:#f3f4f6;border:1px solid #d1d5db;color:#374151}

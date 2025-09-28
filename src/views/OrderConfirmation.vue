@@ -217,6 +217,15 @@ export default {
         const data = await r.json()
         this.paymentStatus = data && data.ok ? 'paid' : 'failed'
         this.paymentMeta = data || null
+        
+        // Dispatch event to notify other components that payment is completed
+        if (this.paymentStatus === 'paid') {
+          try {
+            window.dispatchEvent(new CustomEvent('mv:payment:completed', { 
+              detail: { orderId: this.order?.id, txRef: this.txRef } 
+            }))
+          } catch (_) { /* ignore */ }
+        }
         // Load audit trail for richer visibility (best-effort)
         try {
           const ra = await fetch(`https://multi-vendor-ecommerce-website.onrender.com/payments/status?tx_ref=${encodeURIComponent(this.txRef)}`)
@@ -233,7 +242,16 @@ export default {
               const d2 = await r2.json()
               this.paymentStatus = d2 && d2.ok ? 'paid' : 'failed'
               this.paymentMeta = d2 || null
-              if (this.paymentStatus === 'paid') { clearInterval(this.pollTimer); this.pollTimer = null }
+              if (this.paymentStatus === 'paid') { 
+                clearInterval(this.pollTimer); 
+                this.pollTimer = null
+                // Dispatch event to notify other components that payment is completed
+                try {
+                  window.dispatchEvent(new CustomEvent('mv:payment:completed', { 
+                    detail: { orderId: this.order?.id, txRef: this.txRef } 
+                  }))
+                } catch (_) { /* ignore */ }
+              }
             } catch (_) { /* ignore poll error */ }
           }, 10000)
         }

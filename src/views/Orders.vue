@@ -44,10 +44,10 @@
 
         <ul style="list-style:none;padding:0;margin-top:8px;display:grid;gap:8px;">
           <li v-for="i in o.items" :key="i.id" style="display:flex;align-items:center;gap:8px;">
-            <img :src="i.product.imageUrl" :alt="i.product.name"
+            <img :src="i.product_image || i.product?.imageUrl" :alt="i.product_name || i.product?.name"
                  style="width:36px;height:36px;object-fit:cover;border-radius:6px;"/>
-            <div style="flex:1;">{{ i.product.name }} × {{ i.quantity }}</div>
-            <div>{{ formatETB(i.lineTotal) }}</div>
+            <div style="flex:1;">{{ i.product_name || i.product?.name }} × {{ i.quantity }}</div>
+            <div>{{ formatETB(i.line_total || i.lineTotal) }}</div>
           </li>
         </ul>
 

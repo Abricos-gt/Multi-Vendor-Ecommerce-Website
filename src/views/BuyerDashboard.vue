@@ -16,7 +16,10 @@
       <nav class="bd__tabs">
         <button :class="{active: tab==='overview'}" @click="tab='overview'">Overview</button>
         <button :class="{active: tab==='orders'}" @click="tab='orders'">Orders</button>
-        <button :class="{active: tab==='wishlist'}" @click="tab='wishlist'">Wishlist</button>
+        <button :class="{active: tab==='wishlist'}" @click="tab='wishlist'" :disabled="!isAuthenticated">
+          <i class="fas fa-heart"></i>
+          Wishlist
+        </button>
         <button :class="{active: tab==='addresses'}" @click="tab='addresses'">Addresses</button>
         <button :class="{active: tab==='settings'}" @click="tab='settings'">Settings</button>
       </nav>
@@ -45,7 +48,18 @@
     </div>
 
     <div v-else-if="tab==='wishlist'" class="bd__panel">
-      <div v-if="wishlist.length" class="grid">
+      <div v-if="!isAuthenticated" class="auth-required">
+        <div class="auth-message">
+          <i class="fas fa-lock"></i>
+          <h3>Sign In Required</h3>
+          <p>Please sign in to view and manage your wishlist.</p>
+          <button @click="redirectToSignIn" class="btn-signin">
+            <i class="fas fa-sign-in-alt"></i>
+            Sign In
+          </button>
+        </div>
+      </div>
+      <div v-else-if="wishlist.length" class="grid">
         <div class="cardp" v-for="p in wishlist" :key="p.id" @click="openDetail(p.id)">
           <img :src="p.imageUrl || p.image_url" :alt="p.name"/>
           <div class="n">{{ p.name }}</div>
@@ -174,7 +188,7 @@ export default {
   methods: {
     formatETB,
     goBack(){ window.history.back() },
-    displayTotal(o){ return o.total || o.total_amount || 0 },
+    displayTotal(o){ return o.total_amount || o.total || 0 },
     openDetail(id){ window.location.hash = `#/products/${id}` },
     async loadWishlist(){
       try{ 
@@ -207,10 +221,17 @@ export default {
     async loadOrders(){
       const u = store.getUser()
       if(!u){ this.orders=[]; return }
-      try{ const { data } = await http.get(`/users/${u.id}/orders`); this.orders = Array.isArray(data)? data:[] }catch(_){ this.orders=[] }
+      try{ 
+        const { data } = await http.get(`/users/${u.id}/orders`); 
+        this.orders = Array.isArray(data)? data:[]
+        console.log('BuyerDashboard: Loaded orders', this.orders.length)
+      }catch(error){ 
+        console.error('BuyerDashboard: Failed to load orders', error)
+        this.orders=[] 
+      }
       this.stats.orders = this.orders.length
-      this.stats.inProgress = this.orders.filter(o=> (o.status||'').toLowerCase()!=='delivered').length
-      this.stats.delivered = this.orders.filter(o=> (o.status||'').toLowerCase()==='delivered').length
+      this.stats.inProgress = this.orders.filter(o=> (o.status||'').toLowerCase()!=='completed' && (o.status||'').toLowerCase()!=='delivered').length
+      this.stats.delivered = this.orders.filter(o=> (o.status||'').toLowerCase()==='completed' || (o.status||'').toLowerCase()==='delivered').length
     },
     async loadAddresses(){
       const u = store.getUser()
@@ -306,6 +327,12 @@ export default {
         country: '',
         phone: ''
       }
+    },
+    isAuthenticated() {
+      return !!store.getUser()
+    },
+    redirectToSignIn() {
+      window.location.hash = '#/signin'
     }
   },
   created(){ this.loadWishlist(); this.loadOrders(); this.loadAddresses() },
@@ -313,15 +340,23 @@ export default {
     tab(newTab) {
       if (newTab === 'wishlist') {
         this.loadWishlist()
+      } else if (newTab === 'orders') {
+        this.loadOrders() // Refresh orders when switching to orders tab
       }
     }
   },
   mounted() {
     // Listen for store updates to refresh wishlist
     window.addEventListener('mv:store:update', this.loadWishlist)
+    // Listen for order updates to refresh orders
+    window.addEventListener('mv:order:updated', this.loadOrders)
+    // Listen for payment completion to refresh orders
+    window.addEventListener('mv:payment:completed', this.loadOrders)
   },
   beforeUnmount() {
     window.removeEventListener('mv:store:update', this.loadWishlist)
+    window.removeEventListener('mv:order:updated', this.loadOrders)
+    window.removeEventListener('mv:payment:completed', this.loadOrders)
   }
 }
 </script>
@@ -535,6 +570,76 @@ input:focus {
   .form-actions {
     flex-direction: column;
   }
+}
+
+.bd__tabs button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bd__tabs button:disabled:hover {
+  background: transparent;
+  color: inherit;
+}
+
+.auth-required {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  padding: 40px 20px;
+}
+
+.auth-message {
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  max-width: 400px;
+  width: 100%;
+}
+
+.auth-message i {
+  font-size: 48px;
+  color: #6b7280;
+  margin-bottom: 20px;
+}
+
+.auth-message h3 {
+  margin: 0 0 12px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.auth-message p {
+  margin: 0 0 24px 0;
+  color: #6b7280;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.btn-signin {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #37A000;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-signin:hover {
+  background: #2d7a00;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(55, 160, 0, 0.3);
 }
 </style>
 
